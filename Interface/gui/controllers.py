@@ -23,4 +23,4 @@ class LoadFilesController(Controller):
 
     def process_json(self, event):
         key_to_possible_values_dic = self.model.m_process_json()
-        self.view.create_combobox(key_to_possible_values_dic)
+        self.view.create_comboboxes(key_to_possible_values_dic)

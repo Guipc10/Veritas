@@ -135,19 +135,73 @@ class LoadFilesView(View):
         self.headerLabel = ttk.Label(self.headerFrame,text = 'Filtros', style = 'Subtitle.TLabel')
         self.headerLabel.grid(row = 0)
 
-    def create_combobox(self,key_to_possible_values_dic):
+    def create_comboboxes(self,key_to_possible_values_dic):
         self.filtersLabel = []
-        self.filtersCombobox = []
+        #Its a list of frames since more than one option can be chosen
+        self.filtersComboboxFrames = []
         for i,key in enumerate(key_to_possible_values_dic.keys()):
             self.filtersLabel.append(ttk.Label(self.optionsFrame, text = key, justify = tk.RIGHT))
             self.filtersLabel[i].grid(row=i, column=0, sticky = tk.E, padx = 10)
-            if self.is_date(key_to_possible_values_dic[key][0]):
-                print('é data')
-            else:
-                print('não é data')
-            self.filtersCombobox.append(ttk.Combobox(self.optionsFrame,font = self.verytiny_font,justify = 'right', state = 'readonly', values = list(key_to_possible_values_dic[key])))
-            self.filtersCombobox[i].bind('<Button-1>',self.combo_configure)
-            self.filtersCombobox[i].grid(row=i, column=1, sticky=tk.E)
+            self.filtersComboboxFrames.append(ttk.Frame(self.optionsFrame))
+            self.filtersComboboxFrames[i].grid(row = i, column = 1, pady = 2, sticky = tk.W)
+            # if self.is_date(key_to_possible_values_dic[key][0]):
+            #     create_date_selection(self.filtersComboboxFrames[i],font = self.verytiny_font,justify = 'right', state = 'readonly', values = list(key_to_possible_values_dic[key]))
+            # else:
+            self.create_combobox(parent = self.filtersComboboxFrames[i],width = 15,font = self.verytiny_font,justify = 'right', state = 'readonly', values = list(key_to_possible_values_dic[key]))
+            # self.filtersComboboxFrames[i].bind('<Button-1>',self.combo_configure)
+            # self.filtersComboboxFrames[i].grid(row=i, column=1, sticky=tk.E)
+
+    def create_combobox(self, parent, width, font, justify, state, values):
+        #add a empty option
+        add_empty_values = values.copy()
+        if '' not in add_empty_values:
+            add_empty_values.insert(0,'')
+        newCombobox = ttk.Combobox(parent,width = width, font = font, justify = justify, state = state, values = add_empty_values)
+        newCombobox.bind('<Button-1>',self.combo_configure)
+        column = len(parent.grid_slaves(row = 0))
+        newCombobox.grid(row = 0, column = column, padx = 10,sticky = tk.E)
+
+        #create button to add one more filter option
+        add_button = ttk.Button(parent, text = '+')
+        add_button.bind('<Button-1>',self.create_combobox_button)
+        add_button.grid(row = 0, column = column + 1, padx = 10)
+
+        #create delete filter option button if its not the first filter
+        if (column > 0):
+            delete_button = ttk.Button(parent, text = '-')
+            delete_button.bind('<Button-1>',self.delete_combobox_button)
+            delete_button.grid(row = 0, column = column + 2)
+
+    #add one more combobox when the button is clicked
+    def create_combobox_button(self,event):
+        button = event.widget
+        parent = button.nametowidget(button.winfo_parent())
+        if len(parent.grid_slaves(row = 0)) > 2:
+            #there is a delete button already, so it has to be deleted before creating another one
+            last_box_column = len(parent.grid_slaves(row = 0)) - 3
+            delete_button_column  = len(parent.grid_slaves(row = 0)) - 1
+            delete_button = (parent.grid_slaves(row = 0, column = delete_button_column))[0]
+            delete_button.destroy()
+        else:
+            last_box_column = len(parent.grid_slaves(row = 0)) - 2
+        last_box = (parent.grid_slaves(row = 0, column = last_box_column))[0]
+        font = last_box.cget('font')
+        width = last_box.cget('width')
+        justify = last_box.cget('justify')
+        state = last_box.cget('state')
+        values = list(last_box.cget('values'))
+
+        button.destroy()
+        self.create_combobox(parent, width = width, font = font, justify = justify, state = state, values = values)
+
+    def delete_combobox_button(self, event):
+        button = event.widget
+        parent = button.nametowidget(button.winfo_parent())
+        last_box_column = len(parent.grid_slaves(row = 0)) - 3
+        last_box = (parent.grid_slaves(row = 0, column = last_box_column))[0]
+        if last_box_column == 1:
+            button.destroy()
+        last_box.destroy()
 
     #Configure combobox so its size adapts to its values
     def combo_configure(self,event):

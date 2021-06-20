@@ -11,10 +11,13 @@ class Application(ttk.Frame):
         self.parent = parent
         #set main window configurations
         self.parent.title("Veritas")
-        self.parent.geometry('1024x800')
+        self.desktop_width = self.parent.winfo_screenwidth()
+        self.desktop_height = self.parent.winfo_screenheight()
+        self.parent.geometry(f'{self.desktop_width}x{self.desktop_height}')
         self.background = 'white'
         self.parent.config(background=self.background)
-        self.grid()
+        self.parent.grid_propagate(False)
+        self.pack()
 
     def add_module(self, controller: Controller, view: View):
         view = view(self)
