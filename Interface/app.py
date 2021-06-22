@@ -16,13 +16,10 @@ class Application(ttk.Frame):
         self.parent.geometry(f'{self.desktop_width}x{self.desktop_height}')
         self.background = 'white'
         self.parent.config(background=self.background)
-        self.parent.grid_propagate(False)
-        self.pack()
+        self.pack(fill='both', expand=True, anchor = 'center')
 
     def add_module(self, controller: Controller, view: View):
         view = view(self)
-        #maybe change this grid
-        view.grid()
         controller.bind(view)
 
 if __name__ == '__main__':

@@ -3,12 +3,16 @@ import os
 import tkinter as tk
 from tkinter import ttk as ttk
 from tkinter import filedialog, font
+from tkscrolledframe import ScrolledFrame
 from dateutil.parser import parse
+from gui.util.helper_classes import ScrollFrame
 
 class View(ttk.Frame):
     @abstractmethod
     def create_view():
         raise NotImplementedError
+
+
 
 class LoadFilesView(View):
 
@@ -31,6 +35,12 @@ class LoadFilesView(View):
         self.style.configure("Header.TLabel",background=self.background,font=('Helvetica',20,'bold'))
         self.style.configure('TCombobox',background=self.background, font=('Helvetica',5))
         self.option_add("*TCombobox*Listbox*Font", self.verytiny_font)
+        self.pack(fill='both', expand=True, anchor = 'center')
+
+        #create scrollable frame
+        self.scrollFrame = ScrollFrame(self)
+        self.scrollFrame.pack(side='top',fill='both',expand=True,anchor = 'center')
+        self.scrollFrame.viewPort.columnconfigure(0, weight = 1)
 
         #document's path
         self.files_path = tk.StringVar()
@@ -40,10 +50,9 @@ class LoadFilesView(View):
         self.number_of_files_string.set('')
 
     def create_view(self):
-        #Create frames
-        self.headerFrame = ttk.Frame(self)
-        self.loadfilesFrame = ttk.Frame(self)
-        self.filtersFrame = ttk.Frame(self)
+        self.headerFrame = ttk.Frame(self.scrollFrame.viewPort)
+        self.loadfilesFrame = ttk.Frame(self.scrollFrame.viewPort)
+        self.filtersFrame = ttk.Frame(self.scrollFrame.viewPort)
 
         self.headerFrame.grid(row = 0,pady = 20)
         self.loadfilesFrame.grid(row = 1, pady = 20)
@@ -58,6 +67,7 @@ class LoadFilesView(View):
 
         #Filters
         self.create_filter(self.filtersFrame)
+
 
     def create_header(self,parent):
         parent.columnconfigure(0, weight=1,minsize = 1024)
@@ -144,12 +154,38 @@ class LoadFilesView(View):
             self.filtersLabel[i].grid(row=i, column=0, sticky = tk.E, padx = 10)
             self.filtersComboboxFrames.append(ttk.Frame(self.optionsFrame))
             self.filtersComboboxFrames[i].grid(row = i, column = 1, pady = 2, sticky = tk.W)
-            # if self.is_date(key_to_possible_values_dic[key][0]):
-            #     create_date_selection(self.filtersComboboxFrames[i],font = self.verytiny_font,justify = 'right', state = 'readonly', values = list(key_to_possible_values_dic[key]))
-            # else:
-            self.create_combobox(parent = self.filtersComboboxFrames[i],width = 15,font = self.verytiny_font,justify = 'right', state = 'readonly', values = list(key_to_possible_values_dic[key]))
+            if self.is_date(key_to_possible_values_dic[key][0]):
+                self.create_date_combobox(parent = self.filtersComboboxFrames[i],width = 15,font = self.verytiny_font,justify = 'right', state = 'readonly', values = list(key_to_possible_values_dic[key]))
+            else:
+                self.create_combobox(parent = self.filtersComboboxFrames[i],width = 15,font = self.verytiny_font,justify = 'right', state = 'readonly', values = list(key_to_possible_values_dic[key]))
             # self.filtersComboboxFrames[i].bind('<Button-1>',self.combo_configure)
             # self.filtersComboboxFrames[i].grid(row=i, column=1, sticky=tk.E)
+
+    def create_date_combobox(self, parent, width, font, justify, state, values):
+        toLabel = ttk.Label(parent, text = 'até',  justify = tk.RIGHT)
+
+        fromCombobox = ttk.Combobox(parent,width = width, font = font, justify = justify, state = state, values = values)
+        fromCombobox.bind('<Button-1>',self.combo_configure)
+        fromCombobox.bind('<<ComboboxSelected>>', self.update_to_combobox)
+
+        toCombobox = ttk.Combobox(parent,width = width, font = font, justify = justify, state = state, values = values)
+        toCombobox.bind('<Button-1>',self.combo_configure)
+
+
+        fromCombobox.grid(row = 0, column = 0, padx = 10)
+        toLabel.grid(row = 0, column = 1, padx = 10)
+        toCombobox.grid(row = 0, column = 2, padx = 10)
+
+    #make toCombobox just show dates that are after the one selected in the first combobox
+    def update_to_combobox(self,event):
+        combo = event.widget
+
+        parent = combo.nametowidget(combo.winfo_parent())
+        column = len(parent.grid_slaves(row = 0)) - 1
+        toCombobox = parent.grid_slaves(row = 0, column = column)[0]
+        currentValues = combo.cget('values')
+
+        toCombobox.configure(values = [value for value in currentValues if parse(value) > parse(currentValues[combo.current()])])
 
     def create_combobox(self, parent, width, font, justify, state, values):
         #add a empty option
