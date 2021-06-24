@@ -3,15 +3,13 @@ import os
 import tkinter as tk
 from tkinter import ttk as ttk
 from tkinter import filedialog, font
-from tkscrolledframe import ScrolledFrame
 from dateutil.parser import parse
-from gui.util.helper_classes import ScrollFrame
+
 
 class View(ttk.Frame):
     @abstractmethod
     def create_view():
         raise NotImplementedError
-
 
 
 class LoadFilesView(View):
@@ -36,11 +34,7 @@ class LoadFilesView(View):
         self.style.configure('TCombobox',background=self.background, font=('Helvetica',5))
         self.option_add("*TCombobox*Listbox*Font", self.verytiny_font)
         self.pack(fill='both', expand=True, anchor = 'center')
-
-        #create scrollable frame
-        self.scrollFrame = ScrollFrame(self)
-        self.scrollFrame.pack(side='top',fill='both',expand=True,anchor = 'center')
-        self.scrollFrame.viewPort.columnconfigure(0, weight = 1)
+        self.columnconfigure(0,weight = 1)
 
         #document's path
         self.files_path = tk.StringVar()
@@ -50,9 +44,9 @@ class LoadFilesView(View):
         self.number_of_files_string.set('')
 
     def create_view(self):
-        self.headerFrame = ttk.Frame(self.scrollFrame.viewPort)
-        self.loadfilesFrame = ttk.Frame(self.scrollFrame.viewPort)
-        self.filtersFrame = ttk.Frame(self.scrollFrame.viewPort)
+        self.headerFrame = ttk.Frame(self)
+        self.loadfilesFrame = ttk.Frame(self)
+        self.filtersFrame = ttk.Frame(self)
 
         self.headerFrame.grid(row = 0,pady = 20)
         self.loadfilesFrame.grid(row = 1, pady = 20)
@@ -264,3 +258,67 @@ class LoadFilesView(View):
 
         except ValueError:
             return False
+
+class QueryOptionsView(View):
+    def __init__(self, parent, *args, **kwargs):
+        ttk.Frame.__init__(self, parent, *args, **kwargs)
+        self.parent = parent
+
+        self.style = ttk.Style()
+        self.background = 'white'
+        self.std_font = ('Helvetica',12)
+        self.button_font = ('Helvetica',10)
+        self.verytiny_font = ('Helvetica',8)
+        self.style.configure("TButton",background=self.background, font = self.button_font)
+        self.style.configure("TFrame",background=self.background)
+        self.style.configure("TLabel",background=self.background,font=self.std_font)
+        self.style.configure("Subtitle.TLabel",background=self.background,font=('Helvetica',15,'bold'))
+        self.style.configure("Header.TLabel",background=self.background,font=('Helvetica',20,'bold'))
+        self.style.configure('TCheckbutton', background=self.background)
+        self.option_add("*TCombobox*Listbox*Font", self.verytiny_font)
+        self.pack(fill='both', expand=True, anchor = 'center')
+        self.columnconfigure(0,weight = 1)
+
+        # List with the label of each query option
+        self.options_label_list = []
+
+        # Each query option has its own frame, that is stored in this list
+        self.options_frame_list = []
+
+        # List with the control variable for each of the query options checkboxes
+        self.checkboxes_variable_list = []
+
+    def create_view(self):
+        self.headerFrame = ttk.Frame(self)
+        self.headerFrame.grid(row = 0, column = 0)
+
+        self.headerLabel = ttk.Label(self.headerFrame, text = 'Consulta', style = "Subtitle.TLabel")
+        self.headerLabel.grid(row = 0, column = 0)
+
+        self.queryOptionsFrame = ttk.Frame(self)
+        self.queryOptionsFrame.grid(row = 1, column = 0, pady =  20)
+
+
+
+    # Create the query options based on the parameter models_view_dict, if no view frame is given then just the standard
+    # checkbox with the model's name will be created
+    def create_query_options(self, models_view_dict):
+        for i,(model_name, view_component) in enumerate(models_view_dict.items()):
+            print('model name é', model_name, 'i é', i)
+            self.options_label_list.append(ttk.Label(self.queryOptionsFrame, text = model_name))
+            self.options_label_list[i].grid(row = i, column = 0, padx = 10)
+            self.options_frame_list.append(ttk.Frame(self.queryOptionsFrame))
+            self.options_frame_list[i].grid(row = i, column = 1)
+            self.checkboxes_variable_list.append(tk.IntVar())
+            check_box = ttk.Checkbutton(self.options_frame_list[i], variable = self.checkboxes_variable_list[i])
+            check_box.grid(row = 0, column = 0)
+            if view_component != None:
+                # Create another frame for the view component
+                tmp_frame = ttk.Frame(self.options_frame_list[i])
+                #place it next to the checkbox
+                tmp_frame.grid(row = i, column = 1)
+                view_component(tmp_frame)
+                view_component.create_view()
+        #Create query button, the command is binded by the controller
+        self.query_button = ttk.Button(self.queryOptionsFrame, text = 'Gerar Consulta')
+        self.query_button.grid(row = i + 1, column = 0, columnspan = 2, pady = 20)

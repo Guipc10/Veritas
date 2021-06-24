@@ -1,6 +1,13 @@
 import json,os
 import tkinter as tk
 from tkinter import ttk as ttk
+from abc import ABC, abstractmethod
+
+# All new modules have to inherit from this class
+class ComponentModel():
+    @abstractmethod
+    def getName():
+        raise NotImplementedError
 
 class LoadFilesModel():
 
@@ -53,3 +60,10 @@ class LoadFilesModel():
             self.key_to_possible_values_dic[key] = sorted(self.key_to_possible_values_dic[key],key= str.lower)
 
         return self.key_to_possible_values_dic
+
+class TestModel(ComponentModel):
+    def __init__(self):
+        print('Starting test model')
+
+    def getName(self):
+        return 'Test Model'
