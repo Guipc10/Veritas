@@ -138,11 +138,18 @@ class LoadFilesView(View):
 
         self.headerLabel = ttk.Label(self.headerFrame,text = 'Filtros', style = 'Subtitle.TLabel')
         self.headerLabel.grid(row = 0)
+        self.headerSubtitleLabel = ttk.Label(self.headerFrame,text = '(Deixe em branco para considerar todos os arquivos)', style = 'Tiny.TLabel')
+        self.headerSubtitleLabel.grid(row = 1)
 
     def create_comboboxes(self,key_to_possible_values_dic):
         self.filtersLabel = []
+
         #Its a list of frames since more than one option can be chosen
         self.filtersComboboxFrames = []
+
+        #Its a list for each metadata, where its content is another list
+        self.filtersSelection = []
+
         for i,key in enumerate(key_to_possible_values_dic.keys()):
             self.filtersLabel.append(ttk.Label(self.optionsFrame, text = key, justify = tk.RIGHT))
             self.filtersLabel[i].grid(row=i, column=0, sticky = tk.E, padx = 10)
@@ -259,6 +266,20 @@ class LoadFilesView(View):
         except ValueError:
             return False
 
+    # return a dict where the keys are the metadata name and the items are the filters selection for that metadata
+    def get_filters(self):
+        filters_dict = {}
+        for i,label in enumerate(self.filtersLabel):
+            filters_dict[label.cget('text')] = []
+            combo_frame = self.filtersComboboxFrames[i]
+            for object in combo_frame.grid_slaves(row = 0):
+                if isinstance(object,ttk.Combobox):
+                    if (object.current() == -1):
+                        filters_dict[label.cget('text')].append('')
+                    else:
+                        filters_dict[label.cget('text')].append(object.cget('values')[object.current()])
+        return filters_dict
+
 class QueryOptionsView(View):
     def __init__(self, parent, *args, **kwargs):
         ttk.Frame.__init__(self, parent, *args, **kwargs)
@@ -304,7 +325,6 @@ class QueryOptionsView(View):
     # checkbox with the model's name will be created
     def create_query_options(self, models_view_dict):
         for i,(model_name, view_component) in enumerate(models_view_dict.items()):
-            print('model name é', model_name, 'i é', i)
             self.options_label_list.append(ttk.Label(self.queryOptionsFrame, text = model_name))
             self.options_label_list[i].grid(row = i, column = 0, padx = 10)
             self.options_frame_list.append(ttk.Frame(self.queryOptionsFrame))
@@ -322,3 +342,11 @@ class QueryOptionsView(View):
         #Create query button, the command is binded by the controller
         self.query_button = ttk.Button(self.queryOptionsFrame, text = 'Gerar Consulta')
         self.query_button.grid(row = i + 1, column = 0, columnspan = 2, pady = 20)
+
+    def get_selected_models(self):
+        selected_models_name = []
+        for i, variable in enumerate(self.checkboxes_variable_list):
+            print(f'i é {i}, variable é {variable}')
+            if variable.get() == 1:
+                selected_models_name.append(self.options_label_list[i].cget('text'))
+        return selected_models_name

@@ -25,7 +25,6 @@ class LoadFilesController(Controller):
         key_to_possible_values_dic = self.model.m_process_json()
         self.view.create_comboboxes(key_to_possible_values_dic)
 
-#
 class MainController(Controller):
     def __init__(self, model: LoadFilesModel, view: LoadFilesView):
         self.load_files_model = model
@@ -34,11 +33,7 @@ class MainController(Controller):
         self.models_dict = {}
         self.models_view_dict = {}
 
-    def bind(self, **kwargs):
-        try:
-            view = kwargs['view']
-        except:
-            raise KeyError('You must provide a View class')
+    def bind(self,view: View, **kwargs):
 
         if 'model' in kwargs.keys():
             model = kwargs['model']
@@ -52,5 +47,11 @@ class MainController(Controller):
 
 
     def generate_query(self, event):
-        #since the button that generated this event is in the same frame as the checkboxes, so the values can be accessed easily
-        print('generate query')
+        #get a list of names of the models that are going to be used
+        selected_models = self.query_options_view.get_selected_models()
+
+        #get the filters to be considered
+        filters_dict = self.load_files_view.get_filters()
+
+        #apply filters on the data to generate a filtered data
+        filtered_data = self.load_files_model.apply_filters(filters_dict)

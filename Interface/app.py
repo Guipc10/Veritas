@@ -44,6 +44,8 @@ if __name__ == '__main__':
     main_controller = MainController(load_files_model, load_files_view)
 
     testModel = TestModel()
+
+    # The View class is passed not instantiated
     app.add_module(controller = main_controller, view = None, model = testModel)
 
     app.add_module(controller = main_controller, view = QueryOptionsView)
