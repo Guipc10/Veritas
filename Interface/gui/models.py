@@ -3,11 +3,41 @@ import tkinter as tk
 from tkinter import ttk as ttk
 from abc import ABC, abstractmethod
 from dateutil.parser import parse
+import matplotlib.pyplot as plt
+import pandas as pd
 
 # All new modules have to inherit from this class
 class ComponentModel():
     @abstractmethod
-    def getName():
+    def get_name():
+        '''
+        This method returns the name of the model
+
+        Outputs:
+        - Model name (Type: str)
+        '''
+        raise NotImplementedError
+
+    @abstractmethod
+    def requires_extra_input():
+        '''
+        This method tell wheter this model requires an extra input or not
+
+        Outputs:
+        - Model's requirement of extra input (Type: bool)
+        '''
+        raise NotImplementedError
+
+    @abstractmethod
+    def execute(data, extra_input = None):
+        '''
+        This method executes it's algorithm on the given data
+
+        Inputs:
+        - Input data (Type: List of dictionaries)
+        Outputs:
+        - Model's output list(Type: string or path to png or jpeg image)
+        '''
         raise NotImplementedError
 
 class LoadFilesModel():
@@ -122,5 +152,46 @@ class TestModel(ComponentModel):
     def __init__(self):
         print('Starting test model')
 
-    def getName(self):
+    def get_name(self):
         return 'Test Model'
+
+    def requires_extra_input(self):
+        return False
+
+    def execute(self, data, extra_input = None):
+        fig,ax = plt.subplots()
+        ax.plot([1,2,3],[1,2,3])
+        cwd = os.getcwd()
+        fig.savefig(cwd+'/images/fig1.png')
+        img_path = cwd+'/images/fig1.png'
+        return ['test_output', img_path]
+
+class CountDocuments(ComponentModel):
+    def __init__(self):
+        print('Starting Count Documents model')
+
+    def get_name(self):
+        return 'Count Documents'
+
+    def requires_extra_input(self):
+        return False
+
+    def execute(self, data, extra_input):
+        '''
+        This module's required extra input is a list containing the categories on where the count in going to be made
+        '''
+        output = []
+        df = pd.DataFrame.from_records(data)
+        output.append('Número total de documentos: ' + str(len(df)))
+        for column in df[:len(df)-1]:
+            grouped_count = df.groupby(column).count()
+            output.append('\nNúmero de documentos por: ' + str(column))
+            if column != 'julgado':
+                for i in range(0,len(grouped_count)):
+                    one_column_frame = grouped_count[grouped_count.columns[0]]
+                    output.append(str(one_column_frame.index[i]) + ': ' + str(one_column_frame[i]))
+
+        return output
+        # grouped = df.groupby('classe')
+        # count = grouped.count()
+        # print(count['processo'])

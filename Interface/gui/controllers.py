@@ -37,8 +37,8 @@ class MainController(Controller):
 
         if 'model' in kwargs.keys():
             model = kwargs['model']
-            self.models_dict[model.getName()] = model
-            self.models_view_dict[model.getName()] = view
+            self.models_dict[model.get_name()] = model
+            self.models_view_dict[model.get_name()] = view
         else:
             self.query_options_view = view
             self.query_options_view.create_view()
@@ -53,5 +53,19 @@ class MainController(Controller):
         #get the filters to be considered
         filters_dict = self.load_files_view.get_filters()
 
-        #apply filters on the data to generate a filtered data
+        #apply filters on the data to generate a filtered data, the data returned is a list of dicts,
+        # where each dictionary is one document
         filtered_data = self.load_files_model.apply_filters(filters_dict)
+
+        # Output is a list of lists, where the first element of each list is the name of the model and the second is its content:
+        # a list of strings and images
+        output = []
+        for model_name in selected_models:
+            if self.models_dict[model_name].requires_extra_input():
+                extra_input = self.models_view_dict[model_name].get_extra_input()
+            else:
+                extra_input = None
+            output.append([model_name, self.models_dict[model_name].execute(filtered_data, extra_input)])
+
+        # Generates a pdf file
+        self.query_options_view.generate_output(output)

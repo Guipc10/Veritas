@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk as ttk
 from  gui.controllers import LoadFilesController, Controller, MainController
 from gui.views import LoadFilesView, View, QueryOptionsView
-from gui.models import LoadFilesModel, TestModel
+from gui.models import LoadFilesModel, TestModel, CountDocuments
 from gui.util.helper_classes import ScrollFrame
 
 class Application(ttk.Frame):
@@ -44,9 +44,11 @@ if __name__ == '__main__':
     main_controller = MainController(load_files_model, load_files_view)
 
     testModel = TestModel()
+    countDocuments = CountDocuments()
 
     # The View class is passed not instantiated
     app.add_module(controller = main_controller, view = None, model = testModel)
+    app.add_module(controller = main_controller, view = None, model = countDocuments)
 
     app.add_module(controller = main_controller, view = QueryOptionsView)
 

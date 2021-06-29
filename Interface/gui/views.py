@@ -3,6 +3,7 @@ import os
 import tkinter as tk
 from tkinter import ttk as ttk
 from tkinter import filedialog, font
+from fpdf import FPDF
 from dateutil.parser import parse
 
 
@@ -90,7 +91,7 @@ class LoadFilesView(View):
         self.search_button.bind('<Button-1>',self.find_path)
 
         self.number_of_files_label = ttk.Label(self.middle_frame,textvariable=self.number_of_files_string, style = 'NumberofFiles.TLabel')
-        self.number_of_files_label.grid(row = 0,pady = 10)
+        self.number_of_files_label.grid(row = 0,column = 0,pady = 10)
 
 
         self.process_files_button = ttk.Button(self.middle_frame, text = 'Processar arquivos')
@@ -114,7 +115,6 @@ class LoadFilesView(View):
             self.json_files = [json_file for json_file in os.listdir(self.files_path.get()) if json_file.endswith('.json')]
         except FileNotFoundError:
             tk.messagebox.showerror(title='Erro',message='Diretório inválido')
-
         number_of_files = len(self.json_files)
         if number_of_files > 1:
             self.number_of_files_string.set(f'Há {number_of_files} arquivos JSON no diretório selecionado, todos serão considerados.')
@@ -280,6 +280,19 @@ class LoadFilesView(View):
                         filters_dict[label.cget('text')].append(object.cget('values')[object.current()])
         return filters_dict
 
+# Define a custom PDF class so some methods can be overwritten
+class PDF(FPDF):
+    def header(self):
+        self.set_font('helvetica','B',20)
+
+        self.cell(0,10, 'Veritas: resultado da consulta', border = True, ln = True, align = 'C')
+        self.ln(10)
+
+    def footer(self):
+        self.set_y(-10)
+        self.set_font('helvetica','I',10)
+        self.cell(0,10,f'Página {self.page_no()}/{{nb}}', align = 'C')
+
 class QueryOptionsView(View):
     def __init__(self, parent, *args, **kwargs):
         ttk.Frame.__init__(self, parent, *args, **kwargs)
@@ -350,3 +363,28 @@ class QueryOptionsView(View):
             if variable.get() == 1:
                 selected_models_name.append(self.options_label_list[i].cget('text'))
         return selected_models_name
+
+    def generate_output(self, output_list):
+        final_output = []
+
+        self.generate_pdf(output_list)
+
+    def generate_pdf(self, output_list):
+        pdf = PDF('P','mm', 'A4')
+        pdf.alias_nb_pages()
+        pdf.set_auto_page_break(auto=True, margin = 15)
+        pdf.add_page()
+        pdf.set_font('helvetica','',10)
+
+        for output in output_list:
+            pdf.cell(0,10,output[0]+':', ln = True)
+            for printable in output[1]:
+                if printable.endswith('.png') or printable.endswith('.jpeg'):
+                    # It's a png image
+                    pdf.image(printable, x = -0.5, w = pdf.w+1)
+                elif isinstance(printable,str):
+                    pdf.cell(0,6,printable, ln = True)
+                else:
+                    raise TypeError('Models output list must contain only strings (Text) or path to png/jpeg image')
+
+        pdf.output('test.pdf')
