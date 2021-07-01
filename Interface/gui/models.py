@@ -55,6 +55,8 @@ class LoadFilesModel():
         #the possible values for each metadata, its a dictionary where each item is a set
         self.key_to_possible_values_dic = {}
 
+        #all the available metadata, aka keys
+        self.all_keys = []
 
     def set_path_variable(self, path_variable):
         self.files_path = path_variable
@@ -80,6 +82,7 @@ class LoadFilesModel():
                         self.key_to_possible_values_dic[key] = set()
                     self.key_to_possible_values_dic[key].add(value)
 
+        self.all_keys = self.key_to_possible_values_dic.keys()
 
         UNIQUE_KEYS = ['ementa', 'processo', 'cdacordao', 'julgado']
         #remove useless keys from the metadata
@@ -91,7 +94,7 @@ class LoadFilesModel():
         for key in self.key_to_possible_values_dic.keys():
             self.key_to_possible_values_dic[key] = sorted(self.key_to_possible_values_dic[key],key= str.lower)
 
-        return self.key_to_possible_values_dic
+        return self.all_keys, self.key_to_possible_values_dic
 
     def is_date(self,string, fuzzy=False):
         """
@@ -182,14 +185,25 @@ class CountDocuments(ComponentModel):
         '''
         output = []
         df = pd.DataFrame.from_records(data)
-        output.append('Número total de documentos: ' + str(len(df)))
+        total_documents = len(df)
+        output.append('Número total de documentos: ' + str(total_documents))
         for column in df[:len(df)-1]:
             grouped_count = df.groupby(column).count()
+            one_column_frame = grouped_count[grouped_count.columns[0]]
+
             output.append('\nNúmero de documentos por: ' + str(column))
+
+            frame = pd.DataFrame(one_column_frame)
+            # Rename the columns and create a new column with the relative number of documents
+            frame.columns = ['Absoluto']
             if column != 'julgado':
-                for i in range(0,len(grouped_count)):
-                    one_column_frame = grouped_count[grouped_count.columns[0]]
-                    output.append(str(one_column_frame.index[i]) + ': ' + str(one_column_frame[i]))
+                relative = []
+                for i in range(len(frame)):
+                    relative.append(frame.iloc[i,0]/total_documents)
+                print(f'len frame {len(frame)}, len relative {len(relative)}')
+                frame['Relativo'] = relative
+                output.append(frame.to_string(justify='right'))
+                print(frame.to_string())
 
         return output
         # grouped = df.groupby('classe')

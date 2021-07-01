@@ -15,9 +15,10 @@ class View(ttk.Frame):
 
 class LoadFilesView(View):
 
-    def __init__(self, parent, *args, **kwargs):
+    def __init__(self, parent, notebook, *args, **kwargs):
         ttk.Frame.__init__(self, parent, *args, **kwargs)
         self.parent = parent
+        self.notebook = notebook
         #set components style
         self.style = ttk.Style()
         self.background = 'white'
@@ -132,14 +133,42 @@ class LoadFilesView(View):
     def create_filter(self,parent):
         self.headerFrame = ttk.Frame(parent)
         self.headerFrame.grid(row = 0)
-        #this is an attribute because its gonna be used by other method
-        self.optionsFrame = ttk.Frame(parent)
-        self.optionsFrame.grid(row = 1 , pady = 20)
 
-        self.headerLabel = ttk.Label(self.headerFrame,text = 'Filtros', style = 'Subtitle.TLabel')
+        self.selectionfiltersFrame = ttk.Frame(parent)
+        self.selectionfiltersFrame.grid(row = 1 , pady = 20)
+
+        self.visualizationfiltersFrame = ttk.Frame(parent)
+        self.visualizationfiltersFrame.grid(row = 2, pady = 20)
+
+        self.generatequeryButton = ttk.Button(parent, text = 'Gerar consulta')
+        self.generatequeryButton.grid(row = 3)
+
+        self.headerLabel = ttk.Label(self.headerFrame,text = 'Filtros de seleção', style = 'Subtitle.TLabel')
         self.headerLabel.grid(row = 0)
         self.headerSubtitleLabel = ttk.Label(self.headerFrame,text = '(Deixe em branco para considerar todos os arquivos)', style = 'Tiny.TLabel')
         self.headerSubtitleLabel.grid(row = 1)
+
+        self.visualfiltersHeaderLabel = ttk.Label(self.visualizationfiltersFrame, text = 'Filtros de visualização', style = 'Subtitle.TLabel')
+        self.visualfiltersHeaderLabel.grid(row = 0)
+        self.visualfiltersSubtitleLabel = ttk.Label(self.visualizationfiltersFrame, text = '(Selecione as colunas que deseja visualizar na consulta)', style = 'Tiny.TLabel')
+        self.visualfiltersSubtitleLabel.grid(row = 1)
+
+    def create_check_boxes(self, all_keys):
+        self.checkboxesFrame = ttk.Frame(self.visualizationfiltersFrame)
+        self.checkboxesFrame.grid(row = 2)
+
+        # it's a dict where the keys are the columns and the values are 1 if this box was selected and 0 otherwise
+        self.view_filters_boxes_variables = {}
+
+        self.check_boxes = []
+        for i, key in enumerate(all_keys):
+            # self.check_boxes_labels.append(ttk.Label(self.visualizationfiltersFrame, text = key, style = 'Tiny.TLabelL'))
+            # self.check_boxes_labels[i].grid(row = 2, column = i, pady = 20)
+
+            self.view_filters_boxes_variables[key] = tk.IntVar()
+            self.check_boxes.append(ttk.Checkbutton(self.checkboxesFrame, variable = self.view_filters_boxes_variables[key], text = key))
+            self.check_boxes[i].grid(row = 0, column = i, pady = 20, padx = 10)
+            self.view_filters_boxes_variables[key].set(1)
 
     def create_comboboxes(self,key_to_possible_values_dic):
         self.filtersLabel = []
@@ -151,9 +180,9 @@ class LoadFilesView(View):
         self.filtersSelection = []
 
         for i,key in enumerate(key_to_possible_values_dic.keys()):
-            self.filtersLabel.append(ttk.Label(self.optionsFrame, text = key, justify = tk.RIGHT))
+            self.filtersLabel.append(ttk.Label(self.selectionfiltersFrame, text = key, justify = tk.RIGHT))
             self.filtersLabel[i].grid(row=i, column=0, sticky = tk.E, padx = 10)
-            self.filtersComboboxFrames.append(ttk.Frame(self.optionsFrame))
+            self.filtersComboboxFrames.append(ttk.Frame(self.selectionfiltersFrame))
             self.filtersComboboxFrames[i].grid(row = i, column = 1, pady = 2, sticky = tk.W)
             if self.is_date(key_to_possible_values_dic[key][0]):
                 self.create_date_combobox(parent = self.filtersComboboxFrames[i],width = 15,font = self.verytiny_font,justify = 'right', state = 'readonly', values = list(key_to_possible_values_dic[key]))
@@ -280,6 +309,53 @@ class LoadFilesView(View):
                         filters_dict[label.cget('text')].append(object.cget('values')[object.current()])
         return filters_dict
 
+    def get_selected_keys(self):
+        selected_keys = []
+
+        for key, value in self.view_filters_boxes_variables.items():
+            if value == 1:
+                selected_keys.append(key)
+
+        return selected_keys
+
+class QueryView(View):
+    def __init__(self, parent, notebook, *args, **kwargs):
+        ttk.Frame.__init__(self, parent, *args, **kwargs)
+        self.parent = parent
+        self.notebook = notebook
+        #set components style
+        self.style = ttk.Style()
+        self.background = 'white'
+        self.std_font = ('Helvetica',12)
+        self.button_font = ('Helvetica',10)
+        self.verytiny_font = ('Helvetica',8)
+        self.style.configure("TButton",background=self.background, font = self.button_font)
+        self.style.configure("Download.TButton",background=self.background,size=(12,12))
+        self.style.configure("TFrame",background=self.background)
+        self.style.configure("TLabel",background=self.background,font=self.std_font)
+        self.style.configure("NumberofFiles.TLabel",background=self.background,font=('Helvetica',10,'bold'))
+        self.style.configure("Tiny.TLabel",background=self.background,font=('Helvetica',10))
+        self.style.configure("Subtitle.TLabel",background=self.background,font=('Helvetica',15,'bold'))
+        self.style.configure("Header.TLabel",background=self.background,font=('Helvetica',20,'bold'))
+        self.style.configure('TCombobox',background=self.background, font=('Helvetica',5))
+        self.option_add("*TCombobox*Listbox*Font", self.verytiny_font)
+        self.pack(fill='both', expand=True, anchor = 'center')
+        self.columnconfigure(0,weight = 1)
+
+        # List of frames inside the tabs
+        self.tab_frames_list = []
+    def create_view(self):
+        self.tab_frames_list.append(ttk.Frame(self.notebook))
+        self.tab_frames_list[len(self.tab_frames_list)-1].pack(fill='both', expand=True, anchor = 'center')
+        self.notebook.add(self.tab_frames_list[len(self.tab_frames_list) - 1], text = f'Consulta {len(self.tab_frames_list)}')
+        # The index doesn't have to subtract 1 because the first tab is the main tab
+        self.notebook.select(len(self.tab_frames_list))
+        self.generate_query_result_page(self.tab_frames_list[len(self.tab_frames_list) - 1], len(self.tab_frames_list))
+
+    def generate_query_result_page(self, parent, index):
+        self.label = ttk.Label(parent, text = 'oi')
+        self.label.grid()
+
 # Define a custom PDF class so some methods can be overwritten
 class PDF(FPDF):
     def header(self):
@@ -293,11 +369,11 @@ class PDF(FPDF):
         self.set_font('helvetica','I',10)
         self.cell(0,10,f'Página {self.page_no()}/{{nb}}', align = 'C')
 
-class QueryOptionsView(View):
-    def __init__(self, parent, *args, **kwargs):
+class StatisticsOptionsView(View):
+    def __init__(self, parent, notebook, *args, **kwargs):
         ttk.Frame.__init__(self, parent, *args, **kwargs)
         self.parent = parent
-
+        self.notebook = notebook
         self.style = ttk.Style()
         self.background = 'white'
         self.std_font = ('Helvetica',12)
@@ -313,34 +389,34 @@ class QueryOptionsView(View):
         self.pack(fill='both', expand=True, anchor = 'center')
         self.columnconfigure(0,weight = 1)
 
-        # List with the label of each query option
+        # List with the label of each statistics option
         self.options_label_list = []
 
-        # Each query option has its own frame, that is stored in this list
+        # Each statistics option has its own frame, that is stored in this list
         self.options_frame_list = []
 
-        # List with the control variable for each of the query options checkboxes
+        # List with the control variable for each of the statistics options checkboxes
         self.checkboxes_variable_list = []
 
     def create_view(self):
         self.headerFrame = ttk.Frame(self)
         self.headerFrame.grid(row = 0, column = 0)
 
-        self.headerLabel = ttk.Label(self.headerFrame, text = 'Consulta', style = "Subtitle.TLabel")
-        self.headerLabel.grid(row = 0, column = 0)
+        self.headerLabel = ttk.Label(self.headerFrame, text = 'Estatísticas', style = "Subtitle.TLabel")
+        self.headerLabel.grid(row = 0, column = 0, pady = 20)
 
-        self.queryOptionsFrame = ttk.Frame(self)
-        self.queryOptionsFrame.grid(row = 1, column = 0, pady =  20)
+        self.statisticsOptionsFrame = ttk.Frame(self)
+        self.statisticsOptionsFrame.grid(row = 1, column = 0, pady =  20)
 
 
 
     # Create the query options based on the parameter models_view_dict, if no view frame is given then just the standard
     # checkbox with the model's name will be created
-    def create_query_options(self, models_view_dict):
+    def create_statistics_options(self, models_view_dict):
         for i,(model_name, view_component) in enumerate(models_view_dict.items()):
-            self.options_label_list.append(ttk.Label(self.queryOptionsFrame, text = model_name))
+            self.options_label_list.append(ttk.Label(self.statisticsOptionsFrame, text = model_name))
             self.options_label_list[i].grid(row = i, column = 0, padx = 10)
-            self.options_frame_list.append(ttk.Frame(self.queryOptionsFrame))
+            self.options_frame_list.append(ttk.Frame(self.statisticsOptionsFrame))
             self.options_frame_list[i].grid(row = i, column = 1)
             self.checkboxes_variable_list.append(tk.IntVar())
             check_box = ttk.Checkbutton(self.options_frame_list[i], variable = self.checkboxes_variable_list[i])
@@ -353,8 +429,8 @@ class QueryOptionsView(View):
                 view_component(tmp_frame)
                 view_component.create_view()
         #Create query button, the command is binded by the controller
-        self.query_button = ttk.Button(self.queryOptionsFrame, text = 'Gerar Consulta')
-        self.query_button.grid(row = i + 1, column = 0, columnspan = 2, pady = 20)
+        self.statistics_button = ttk.Button(self.statisticsOptionsFrame, text = 'Gerar estatísticas')
+        self.statistics_button.grid(row = i + 1, column = 0, columnspan = 2, pady = 20)
 
     def get_selected_models(self):
         selected_models_name = []
@@ -383,7 +459,7 @@ class QueryOptionsView(View):
                     # It's a png image
                     pdf.image(printable, x = -0.5, w = pdf.w+1)
                 elif isinstance(printable,str):
-                    pdf.cell(0,6,printable, ln = True)
+                    pdf.multi_cell(0,6,printable, ln = True, align='R')
                 else:
                     raise TypeError('Models output list must contain only strings (Text) or path to png/jpeg image')
 

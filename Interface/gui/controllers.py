@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from gui.views import LoadFilesView, View, QueryOptionsView
+from gui.views import LoadFilesView, View, StatisticsOptionsView, QueryView
 from gui.models import LoadFilesModel, ComponentModel
 
 class Controller(ABC):
@@ -7,29 +7,38 @@ class Controller(ABC):
     def bind(view: View, model = None):
         raise NotImplementedError
 
-class LoadFilesController(Controller):
+class FilesController(Controller):
     def __init__(self, model: LoadFilesModel):
         self.model = model
-        self.view = None
+        self.load_files_view = None
+        self.query_view = None
 
-    def bind(self,view: LoadFilesView):
-        self.view = view
-        self.view.create_view()
-        self.view.process_files_button.bind('<Button-1>',self.process_json)
+    def bind(self,view: View):
+        if (isinstance(view, LoadFilesView)):
+            self.load_files_view = view
+            self.load_files_view.create_view()
+            self.load_files_view.process_files_button.bind('<Button-1>',self.process_json)
+            self.load_files_view.generatequeryButton.bind('<Button-1>', self.generate_query)
+            #allow the model to always have the path
+            self.model.set_path_variable(self.load_files_view.files_path)
 
-        #allow the model to always have the path
-        self.model.set_path_variable(self.view.files_path)
+        elif (isinstance(view, QueryView)):
+            self.query_view = view
 
 
     def process_json(self, event):
-        key_to_possible_values_dic = self.model.m_process_json()
-        self.view.create_comboboxes(key_to_possible_values_dic)
+        all_keys, key_to_possible_values_dic = self.model.m_process_json()
+        self.load_files_view.create_comboboxes(key_to_possible_values_dic)
+        self.load_files_view.create_check_boxes(all_keys)
 
-class MainController(Controller):
+    def generate_query(self, event):
+        self.query_view.create_view()
+
+class StatisticsController(Controller):
     def __init__(self, model: LoadFilesModel, view: LoadFilesView):
         self.load_files_model = model
         self.load_files_view = view
-        self.query_options_view = None
+        self.statistics_options_view = None
         self.models_dict = {}
         self.models_view_dict = {}
 
@@ -40,15 +49,15 @@ class MainController(Controller):
             self.models_dict[model.get_name()] = model
             self.models_view_dict[model.get_name()] = view
         else:
-            self.query_options_view = view
-            self.query_options_view.create_view()
-            self.query_options_view.create_query_options(self.models_view_dict)
-            self.query_options_view.query_button.bind('<Button-1>', self.generate_query)
+            self.statistics_options_view = view
+            self.statistics_options_view.create_view()
+            self.statistics_options_view.create_statistics_options(self.models_view_dict)
+            self.statistics_options_view.statistics_button.bind('<Button-1>', self.generate_statistics)
 
 
-    def generate_query(self, event):
+    def generate_statistics(self, event):
         #get a list of names of the models that are going to be used
-        selected_models = self.query_options_view.get_selected_models()
+        selected_models = self.statistics_options_view.get_selected_models()
 
         #get the filters to be considered
         filters_dict = self.load_files_view.get_filters()
@@ -68,4 +77,4 @@ class MainController(Controller):
             output.append([model_name, self.models_dict[model_name].execute(filtered_data, extra_input)])
 
         # Generates a pdf file
-        self.query_options_view.generate_output(output)
+        self.statistics_options_view.generate_output(output)
