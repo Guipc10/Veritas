@@ -82,7 +82,7 @@ class LoadFilesModel():
                         self.key_to_possible_values_dic[key] = set()
                     self.key_to_possible_values_dic[key].add(value)
 
-        self.all_keys = self.key_to_possible_values_dic.keys()
+        self.all_keys = list(self.key_to_possible_values_dic.keys()).copy()
 
         UNIQUE_KEYS = ['ementa', 'processo', 'cdacordao', 'julgado']
         #remove useless keys from the metadata
@@ -117,37 +117,49 @@ class LoadFilesModel():
             if filter != '':
                 flag = False
         return flag
-    def apply_filters(self, filters_dict):
-        new_data = []
 
+    def apply_filters(self, filters_dict, view_filters_list):
+        new_data = []
+        column_delete_set = set()
+        print('view filters list:', view_filters_list)
         for file in self.data_list:
             for dic in file:
+                # make a copy so it doesnt change the original data
+                tmp_dict = dic.copy()
                 add_permission = True
-                for key,value in dic.items():
-                    if key != 'processo':
-                    # processo is a useless key to filter but may cause overflow in the date check
-                        if not self.is_date(value):
-                            # it's  not a date
-                            if key in filters_dict.keys():
-                                # key may has been filtered
-                                if not self.filter_is_empty(filters_dict[key]):
-                                    # filter for this key is not empty
-                                    if value not in filters_dict[key]:
-                                        add_permission = False
-                        else:
-                            # it's a date
-                            if key in filters_dict.keys():
-                                if not self.filter_is_empty(filters_dict[key]):
-                                    initial_date = filters_dict[key][1]
-                                    if initial_date == '':
-                                        initial_date = '1700-01-01'
-                                    end_date = filters_dict[key][0]
-                                    if end_date == '':
-                                        end_date = '5000-01-01'
-                                    if (parse(value) < parse(initial_date)) or (parse(value) > parse(end_date)):
-                                        add_permission = False
+                for key,value in tmp_dict.items():
+                    if key not in view_filters_list:
+                        # This column was not selected in the view filter
+                        column_delete_set.add(key)
+                        continue
+                    else:
+                        if key != 'processo':
+                        # processo is a useless key to filter but may cause overflow in the date check
+                            if not self.is_date(value):
+                                # it's  not a date
+                                if key in filters_dict.keys():
+                                    # key may has been filtered
+                                    if not self.filter_is_empty(filters_dict[key]):
+                                        # filter for this key is not empty
+                                        if value not in filters_dict[key]:
+                                            add_permission = False
+                            else:
+                                # it's a date
+                                if key in filters_dict.keys():
+                                    if not self.filter_is_empty(filters_dict[key]):
+                                        initial_date = filters_dict[key][1]
+                                        if initial_date == '':
+                                            initial_date = '1700-01-01'
+                                        end_date = filters_dict[key][0]
+                                        if end_date == '':
+                                            end_date = '5000-01-01'
+                                        if (parse(value) < parse(initial_date)) or (parse(value) > parse(end_date)):
+                                            add_permission = False
+                # Delete the unwanted columns
+                for column in column_delete_set:
+                    del tmp_dict[column]
                 if add_permission:
-                    new_data.append(dic)
+                    new_data.append(tmp_dict)
 
         return new_data
 
@@ -189,7 +201,11 @@ class CountDocuments(ComponentModel):
         output.append('Número total de documentos: ' + str(total_documents))
         for column in df[:len(df)-1]:
             grouped_count = df.groupby(column).count()
-            one_column_frame = grouped_count[grouped_count.columns[0]]
+            # GETS AN ERROR WHEN THE DATA HAS ONLY ONE COLUMN
+            if len(grouped_count.columns) > 1:
+                one_column_frame = grouped_count[grouped_count.columns[0]]
+            else:
+                one_column_frame = grouped_count
 
             output.append('\nNúmero de documentos por: ' + str(column))
 

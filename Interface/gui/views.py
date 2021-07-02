@@ -5,6 +5,7 @@ from tkinter import ttk as ttk
 from tkinter import filedialog, font
 from fpdf import FPDF
 from dateutil.parser import parse
+from gui.util.helper_classes import ScrollFrame
 
 
 class View(ttk.Frame):
@@ -311,9 +312,8 @@ class LoadFilesView(View):
 
     def get_selected_keys(self):
         selected_keys = []
-
         for key, value in self.view_filters_boxes_variables.items():
-            if value == 1:
+            if value.get() == 1:
                 selected_keys.append(key)
 
         return selected_keys
@@ -344,16 +344,35 @@ class QueryView(View):
 
         # List of frames inside the tabs
         self.tab_frames_list = []
-    def create_view(self):
-        self.tab_frames_list.append(ttk.Frame(self.notebook))
-        self.tab_frames_list[len(self.tab_frames_list)-1].pack(fill='both', expand=True, anchor = 'center')
-        self.notebook.add(self.tab_frames_list[len(self.tab_frames_list) - 1], text = f'Consulta {len(self.tab_frames_list)}')
+
+    def create_view(self, filters_dict, view_filters_list):
+        '''
+        Creates a new scrollable tab on the notebook
+        '''
+        # Create frame inside the notebook
+        helper_frame = ttk.Frame(self.notebook)
+        helper_frame.pack(fill='both', expand=True, anchor = 'center')
+        self.notebook.add(helper_frame, text = f'Consulta {len(self.tab_frames_list)}')
+
+        # Now creates a scrollable frame
+        scrollFrame = ScrollFrame(helper_frame)
+        scrollFrame.pack(side='top',fill='both',expand=True)
+        scrollFrame.viewPort.columnconfigure(0, weight = 1)
+
+        # The actual usable frame is the viewPort
+        self.tab_frames_list.append(scrollFrame.viewPort)
+
         # The index doesn't have to subtract 1 because the first tab is the main tab
         self.notebook.select(len(self.tab_frames_list))
-        self.generate_query_result_page(self.tab_frames_list[len(self.tab_frames_list) - 1], len(self.tab_frames_list))
+        self.generate_query_result_page(self.tab_frames_list[len(self.tab_frames_list) - 1], len(self.tab_frames_list), filters_dict, view_filters_list)
 
-    def generate_query_result_page(self, parent, index):
-        self.label = ttk.Label(parent, text = 'oi')
+        return scrollFrame.viewPort
+
+    def generate_query_result_page(self, parent, index, filters_dict, view_filters_list):
+        main_frame = ttk.Frame(parent)
+        main_frame.pack(side='top',fill='both',expand=True)
+        main_frame.columnconfigure(0, weight = 1)
+        self.label = ttk.Label(main_frame, text = 'oi')
         self.label.grid()
 
 # Define a custom PDF class so some methods can be overwritten
@@ -408,7 +427,13 @@ class StatisticsOptionsView(View):
         self.statisticsOptionsFrame = ttk.Frame(self)
         self.statisticsOptionsFrame.grid(row = 1, column = 0, pady =  20)
 
+    def set_filters(self, filters_dict, view_filters_list):
+        self.filters_dict = filters_dict
+        self.view_filters_list = view_filters_list
 
+    # Return the filters that were set for this options tab
+    def get_filters(self):
+        return self.filters_dict, self.view_filters_list
 
     # Create the query options based on the parameter models_view_dict, if no view frame is given then just the standard
     # checkbox with the model's name will be created

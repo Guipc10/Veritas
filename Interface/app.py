@@ -22,13 +22,10 @@ class Application(ttk.Frame):
         self.style.configure("TNotebook",background=self.background)
 
         self.pack(fill='both', expand=True, anchor = 'center')
-        # Create frame with vertical scrollbar
-        self.scrollFrame = ScrollFrame(self)
-        self.scrollFrame.pack(side='top',fill='both',expand=True)
-        self.scrollFrame.viewPort.columnconfigure(0, weight = 1)
+
 
         # Create a notebook so the gui can have tabs
-        self.notebook = ttk.Notebook(self.scrollFrame.viewPort)
+        self.notebook = ttk.Notebook(self)
         self.notebook.pack(fill='both', expand=True)
         self.notebook.columnconfigure(0, weight = 1)
 
@@ -37,9 +34,15 @@ class Application(ttk.Frame):
         self.first_tab.pack(fill='both', expand=True, anchor = 'center')
         self.notebook.add(self.first_tab, text = 'Gerar consulta')
 
+        # Create frame with vertical scrollbar
+        self.scrollFrame = ScrollFrame(self.first_tab)
+        self.scrollFrame.pack(side='top',fill='both',expand=True)
+        self.scrollFrame.viewPort.columnconfigure(0, weight = 1)
+
+
     def add_module(self, controller: Controller, view: View, model = None):
         if model == None:
-            view = view(self.first_tab, self.notebook)
+            view = view(self.scrollFrame.viewPort, self.notebook)
             controller.bind(view = view)
             return view
         else:
@@ -57,16 +60,19 @@ if __name__ == '__main__':
     load_files_view = app.add_module(controller = files_controller, view = LoadFilesView)
     query_view = app.add_module(controller = files_controller, view = QueryView)
 
-    main_controller = StatisticsController(load_files_model, load_files_view)
+    statistics_controller = StatisticsController(load_files_model, load_files_view)
+
+    # Link the controllers
+    files_controller.bind_statistics_controller(statistics_controller)
 
     testModel = TestModel()
     countDocuments = CountDocuments()
 
     # The View class is passed not instantiated
-    app.add_module(controller = main_controller, view = None, model = testModel)
-    app.add_module(controller = main_controller, view = None, model = countDocuments)
+    app.add_module(controller = statistics_controller, view = None, model = testModel)
+    app.add_module(controller = statistics_controller, view = None, model = countDocuments)
 
-    app.add_module(controller = main_controller, view = StatisticsOptionsView)
+    app.add_module(controller = statistics_controller, view = StatisticsOptionsView)
 
 
     #maybe has to be app.mainloop()
