@@ -163,6 +163,19 @@ class LoadFilesModel():
 
         return new_data
 
+    def save_csv(self, filters_dict, view_filters_list, index):
+        data = self.apply_filters(filters_dict, view_filters_list)
+        df = pd.DataFrame.from_records(data)
+        save_directory = tk.filedialog.askdirectory(mustexist = True, title = 'Selecione o diretório em que deseja salvar o arquivo CSV')
+        df.to_csv(save_directory + '/veritas_consulta' + str(index) + '.csv', encoding='utf-8')
+
+    def save_json(self, filters_dict, view_filters_list, index):
+        data = self.apply_filters(filters_dict, view_filters_list)
+        df = pd.DataFrame.from_records(data)
+        save_directory = tk.filedialog.askdirectory(mustexist = True, title = 'Selecione o diretório em que deseja salvar o arquivo JSON')
+        with open(save_directory + '/veritas_consulta' + str(index) + '.json', 'w', encoding='utf-8') as file:
+            df.to_json(file, orient='records', force_ascii=False)
+
 class TestModel(ComponentModel):
     def __init__(self):
         print('Starting test model')

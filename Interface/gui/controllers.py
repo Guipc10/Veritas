@@ -14,6 +14,9 @@ class FilesController(Controller):
         self.query_view = None
         self.statistics_controller = None
 
+        # List of filters for each tab, each item is a tuple
+        self.tab_filters_list = []
+
     def bind(self,view: View):
         if (isinstance(view, LoadFilesView)):
             self.load_files_view = view
@@ -32,14 +35,36 @@ class FilesController(Controller):
     def process_json(self, event):
         all_keys, key_to_possible_values_dic = self.model.m_process_json()
         print(all_keys)
+        self.load_files_view.create_filter()
         self.load_files_view.create_comboboxes(key_to_possible_values_dic)
         self.load_files_view.create_check_boxes(all_keys)
 
     def generate_query(self, event):
         filters_dict = self.load_files_view.get_filters()
         view_filters_list = self.load_files_view.get_selected_keys()
-        new_tab_frame = self.query_view.create_view(filters_dict, view_filters_list)
+
+        data = self.model.apply_filters(filters_dict, view_filters_list)
+        new_tab_frame, csv_button, json_button = self.query_view.create_view(data)
+        # Buttons handlers
+        self.tab_filters_list.append((filters_dict, view_filters_list))
+        index = len(self.tab_filters_list) - 1
+        def csv_handler(event, self=self, i = index):
+            return self.export_to_csv(event, index = i)
+        csv_button.bind('<Button-1>',csv_handler)
+        def json_handler(event, self=self, i = index):
+            return self.export_to_json(event, index = i)
+        json_button.bind('<Button-1>',json_handler)
+
+        # Create statistics options
         self.statistics_controller.call_view(new_tab_frame, filters_dict, view_filters_list)
+
+    def export_to_csv(self, event, index):
+        (filters_dict, view_filters_list) = self.tab_filters_list[index]
+        self.model.save_csv(filters_dict,view_filters_list,index)
+
+    def export_to_json(self, event, index):
+        (filters_dict, view_filters_list) = self.tab_filters_list[index]
+        self.model.save_json(filters_dict,view_filters_list,index)
 
 class StatisticsController(Controller):
     def __init__(self, model: LoadFilesModel, view: LoadFilesView):
@@ -76,8 +101,6 @@ class StatisticsController(Controller):
         # get the filters to be considered, it's in each statistics_options_view because it would take the "gerar consulta" filters
         # otherwise
         filters_dict, view_filters_list = self.statistics_options_view_list[options_view_index].get_filters()
-        # filters_dict = self.load_files_view.get_filters()
-        # view_filters_list = self.load_files_view.get_selected_keys()
 
         #apply filters on the data to generate a filtered data, the data returned is a list of dicts,
         # where each dictionary is one document

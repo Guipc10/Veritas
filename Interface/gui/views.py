@@ -6,6 +6,7 @@ from tkinter import filedialog, font
 from fpdf import FPDF
 from dateutil.parser import parse
 from gui.util.helper_classes import ScrollFrame
+import pandas as pd
 
 
 class View(ttk.Frame):
@@ -62,9 +63,8 @@ class LoadFilesView(View):
         #LoadFiles
         self.create_loadfiles(self.loadfilesFrame)
 
-        #Filters
-        self.create_filter(self.filtersFrame)
-
+        #Set the button now so the command can be binded by the controller
+        self.generatequeryButton = ttk.Button(self.filtersFrame, text = 'Gerar consulta')
 
     def create_header(self,parent):
         parent.columnconfigure(0, weight=1,minsize = 1024)
@@ -131,17 +131,17 @@ class LoadFilesView(View):
         else:
             return True
 
-    def create_filter(self,parent):
-        self.headerFrame = ttk.Frame(parent)
+    def create_filter(self):
+        self.headerFrame = ttk.Frame(self.filtersFrame)
         self.headerFrame.grid(row = 0)
 
-        self.selectionfiltersFrame = ttk.Frame(parent)
+        self.selectionfiltersFrame = ttk.Frame(self.filtersFrame)
         self.selectionfiltersFrame.grid(row = 1 , pady = 20)
 
-        self.visualizationfiltersFrame = ttk.Frame(parent)
+        self.visualizationfiltersFrame = ttk.Frame(self.filtersFrame)
         self.visualizationfiltersFrame.grid(row = 2, pady = 20)
 
-        self.generatequeryButton = ttk.Button(parent, text = 'Gerar consulta')
+        # Grid the button that was already created in the create_view method
         self.generatequeryButton.grid(row = 3)
 
         self.headerLabel = ttk.Label(self.headerFrame,text = 'Filtros de seleção', style = 'Subtitle.TLabel')
@@ -330,6 +330,7 @@ class QueryView(View):
         self.button_font = ('Helvetica',10)
         self.verytiny_font = ('Helvetica',8)
         self.style.configure("TButton",background=self.background, font = self.button_font)
+        self.style.configure("Close.TButton",background=self.background, font=('Helvetica',10,'bold'))
         self.style.configure("Download.TButton",background=self.background,size=(12,12))
         self.style.configure("TFrame",background=self.background)
         self.style.configure("TLabel",background=self.background,font=self.std_font)
@@ -345,10 +346,14 @@ class QueryView(View):
         # List of frames inside the tabs
         self.tab_frames_list = []
 
-    def create_view(self, filters_dict, view_filters_list):
+    def create_view(self, data):
         '''
         Creates a new scrollable tab on the notebook
+
+        Inputs:
+        data: list of dictionaries contaning the data to be showed, it's the data after filtering
         '''
+
         # Create frame inside the notebook
         helper_frame = ttk.Frame(self.notebook)
         helper_frame.pack(fill='both', expand=True, anchor = 'center')
@@ -364,16 +369,51 @@ class QueryView(View):
 
         # The index doesn't have to subtract 1 because the first tab is the main tab
         self.notebook.select(len(self.tab_frames_list))
-        self.generate_query_result_page(self.tab_frames_list[len(self.tab_frames_list) - 1], len(self.tab_frames_list), filters_dict, view_filters_list)
+        csv_button, json_button = self.generate_query_result_page(self.tab_frames_list[len(self.tab_frames_list) - 1], len(self.tab_frames_list)-1, data)
 
-        return scrollFrame.viewPort
+        return scrollFrame.viewPort, csv_button, json_button
 
-    def generate_query_result_page(self, parent, index, filters_dict, view_filters_list):
+    def generate_query_result_page(self, parent, index, data):
+        # Close tab button
+        close_button_frame = ttk.Frame(parent, width = 2)
+        close_button_frame.pack(side='top',fill='both',expand=True)
+        close_button = ttk.Button(close_button_frame, text = 'X', style = 'Close.TButton')
+        close_button.pack(side='right')
+        close_button.bind('<Button-1>', lambda event: self.notebook.hide('current'))
+
         main_frame = ttk.Frame(parent)
         main_frame.pack(side='top',fill='both',expand=True)
         main_frame.columnconfigure(0, weight = 1)
-        self.label = ttk.Label(main_frame, text = 'oi')
-        self.label.grid()
+
+        header = ttk.Label(main_frame, style = "Header.TLabel", text = 'Resultado da consulta')
+        header.grid(row = 0, pady = 20)
+
+        # Show a sample of the data
+        df = pd.DataFrame.from_records(data)
+        txt = tk.Text(main_frame, width = 100, height = 15)
+        txt.tag_config('center', justify = tk.CENTER, wrap = None)
+        txt.grid(row = 1)
+        txt.insert(tk.END,df,'center')
+        # Read only
+        txt.config(state=tk.DISABLED)
+
+        # Info label
+        n_rows = df.shape[0]
+        n_columns = df.shape[1]
+        info_label = ttk.Label(main_frame, text = f'Há {n_rows} documentos nesta consulta e o número de metadados de cada um é {n_columns}.')
+        info_label.grid(row = 2, pady = 10)
+
+        # Buttons
+        buttons_frame = ttk.Frame(main_frame)
+        buttons_frame.grid(row = 3, pady = 10)
+
+        csv_button = ttk.Button(buttons_frame, text = 'Exportar para CSV')
+        csv_button.grid(row = 0, column = 0, padx = 10)
+
+        json_button = ttk.Button(buttons_frame, text = 'Exportar para JSON')
+        json_button.grid(row = 0, column = 1, padx = 10)
+
+        return csv_button, json_button
 
 # Define a custom PDF class so some methods can be overwritten
 class PDF(FPDF):
