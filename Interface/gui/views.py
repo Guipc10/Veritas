@@ -420,7 +420,7 @@ class PDF(FPDF):
     def header(self):
         self.set_font('helvetica','B',20)
 
-        self.cell(0,10, 'Veritas: resultado da consulta', border = True, ln = True, align = 'C')
+        self.cell(0,10, 'Veritas', border = True, ln = True, align = 'C')
         self.ln(10)
 
     def footer(self):
@@ -461,11 +461,11 @@ class StatisticsOptionsView(View):
         self.headerFrame = ttk.Frame(self)
         self.headerFrame.grid(row = 0, column = 0)
 
-        self.headerLabel = ttk.Label(self.headerFrame, text = 'Estatísticas', style = "Subtitle.TLabel")
+        self.headerLabel = ttk.Label(self.headerFrame, text = 'Gerar estatísticas', style = "Subtitle.TLabel")
         self.headerLabel.grid(row = 0, column = 0, pady = 20)
 
         self.statisticsOptionsFrame = ttk.Frame(self)
-        self.statisticsOptionsFrame.grid(row = 1, column = 0, pady =  20)
+        self.statisticsOptionsFrame.grid(row = 1, column = 0)
 
     def set_filters(self, filters_dict, view_filters_list):
         self.filters_dict = filters_dict
@@ -505,27 +505,71 @@ class StatisticsOptionsView(View):
                 selected_models_name.append(self.options_label_list[i].cget('text'))
         return selected_models_name
 
-    def generate_output(self, output_list):
+    def generate_output(self, output_dict):
+        '''
+        Generates the output of the models on the screen
+
+        Inputs:
+        output_dict: A dictionary, where the key is the name of the model and the items are its content:
+        # a list of strings and images
+        '''
         final_output = []
 
-        self.generate_pdf(output_list)
+        # Header
+        header_label = ttk.Label(self, text = 'Estatísticas:', style = "Subtitle.TLabel")
+        header_label.grid(row = 2, column = 0, pady =  20)
 
-    def generate_pdf(self, output_list):
+        # Frame for the results
+        self.statisticsResultsFrame = ttk.Frame(self)
+        self.statisticsResultsFrame.grid(row = 3, column = 0)
+
+        # Generates a frame and a text widget for each model result
+        for i,(model_name, model_output) in enumerate(output_dict.items()):
+            frame = ttk.Frame(self.statisticsResultsFrame)
+            frame.grid(row = i, pady = 20)
+
+            # Label for the model's name
+            label = ttk.Label(frame, text = model_name + ':')
+            label.grid(row = 0)
+
+            # Result box
+            text_box = tk.Text(frame, width = 150, height = 2*len(model_output))
+            text_box.tag_config('center', justify = tk.CENTER, wrap = None)
+            text_box.grid(row = 1)
+            text_box.insert(tk.END,model_output,'center')
+            # Read only
+            text_box.config(state=tk.DISABLED)
+
+            # Export to PDF button
+            export_button = ttk.Button(frame, text = 'Exportar para PDF')
+            export_button.grid(row = 2, column = 0, pady = 10)
+            def handler(event, self=self, output = (model_name, model_output)):
+                return self.generate_pdf(event,output)
+            export_button.bind("<Button-1>", handler)
+
+    def generate_pdf(self, event, output):
+        model_name = output[0]
+        model_output = output[1]
         pdf = PDF('P','mm', 'A4')
         pdf.alias_nb_pages()
         pdf.set_auto_page_break(auto=True, margin = 15)
         pdf.add_page()
+
+
+        # Set header
+        pdf.set_font('helvetica','B',18)
+        pdf.cell(0,10, model_name, ln = True, align = 'C')
+        pdf.ln(10)
+
+        # Set content font
         pdf.set_font('helvetica','',10)
-
-        for output in output_list:
-            pdf.cell(0,10,output[0]+':', ln = True)
-            for printable in output[1]:
-                if printable.endswith('.png') or printable.endswith('.jpeg'):
-                    # It's a png image
-                    pdf.image(printable, x = -0.5, w = pdf.w+1)
-                elif isinstance(printable,str):
-                    pdf.multi_cell(0,6,printable, ln = True, align='R')
-                else:
-                    raise TypeError('Models output list must contain only strings (Text) or path to png/jpeg image')
-
-        pdf.output('test.pdf')
+        for printable in model_output:
+            if printable.endswith('.png') or printable.endswith('.jpeg'):
+                # It's a png image
+                pdf.image(printable, x = -0.5, w = pdf.w+1)
+            elif isinstance(printable,str):
+                pdf.multi_cell(0,6,printable, ln = True, align='R')
+            else:
+                raise TypeError('Models output list must contain only strings (Text) or path to png/jpeg image')
+                
+        pdf.output('veritas_'+model_name+'.pdf')
