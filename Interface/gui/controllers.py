@@ -88,7 +88,7 @@ class StatisticsController(Controller):
         self.statistics_options_view_list.append(StatisticsOptionsView(parent, None))
         self.statistics_options_view_list[len(self.statistics_options_view_list)-1].create_view()
         self.statistics_options_view_list[len(self.statistics_options_view_list)-1].set_filters(filters_dict, view_filters_list)
-        self.statistics_options_view_list[len(self.statistics_options_view_list)-1].create_statistics_options(self.models_view_dict)
+        self.statistics_options_view_list[len(self.statistics_options_view_list)-1].create_statistics_options(self.models_view_dict, view_filters_list)
         def handler(event, self=self, i=(len(self.statistics_options_view_list)-1)):
             return self.generate_statistics(event,i)
         self.statistics_options_view_list[len(self.statistics_options_view_list)-1].statistics_button.bind('<Button-1>', handler)
@@ -116,5 +116,5 @@ class StatisticsController(Controller):
                 extra_input = None
             output[model_name] = self.models_dict[model_name].execute(filtered_data, extra_input)
 
-        # Generates a pdf file
+        # Generates output on the screen
         self.statistics_options_view_list[options_view_index].generate_output(output)

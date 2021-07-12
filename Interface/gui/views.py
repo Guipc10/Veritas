@@ -14,6 +14,38 @@ class View(ttk.Frame):
     def create_view():
         raise NotImplementedError
 
+class ComponentView():
+    def __init__(self):
+        '''
+        Standardize style and background
+        '''
+        self.style = ttk.Style()
+        self.background = 'white'
+        self.std_font = ('Helvetica',12)
+        self.button_font = ('Helvetica',10)
+        self.verytiny_font = ('Helvetica',8)
+        self.style.configure("Std.TButton",background=self.background, font = self.button_font)
+        self.style.configure("Std.TFrame",background=self.background)
+        self.style.configure("Std.TLabel",background=self.background,font=self.std_font)
+        self.style.configure('Std.TCheckbutton', background=self.background)
+
+    @abstractmethod
+    def create_view(parent, view_filters_list):
+        '''
+        This method creates the component view to get the needed inputs
+
+        Inputs:
+        parent: parent frame where the component view is gonna be placed
+        view_filters_list: list of the columns that were selected to be shown, it may be necessary in some cases
+        '''
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_extra_input():
+        '''
+        Returns the necessary input, the format may be of any kind, it just have to match the needs of the matching ModelComponent
+        '''
+        raise NotImplementedError
 
 class LoadFilesView(View):
 
@@ -451,11 +483,11 @@ class StatisticsOptionsView(View):
         # List with the label of each statistics option
         self.options_label_list = []
 
-        # Each statistics option has its own frame, that is stored in this list
-        self.options_frame_list = []
-
         # List with the control variable for each of the statistics options checkboxes
         self.checkboxes_variable_list = []
+
+        # Frame where the statistics are gonna be showed
+        self.statisticsResultsFrame = None
 
     def create_view(self):
         self.headerFrame = ttk.Frame(self)
@@ -477,25 +509,22 @@ class StatisticsOptionsView(View):
 
     # Create the query options based on the parameter models_view_dict, if no view frame is given then just the standard
     # checkbox with the model's name will be created
-    def create_statistics_options(self, models_view_dict):
+    def create_statistics_options(self, models_view_dict, view_filters_list):
         for i,(model_name, view_component) in enumerate(models_view_dict.items()):
             self.options_label_list.append(ttk.Label(self.statisticsOptionsFrame, text = model_name))
             self.options_label_list[i].grid(row = i, column = 0, padx = 10)
-            self.options_frame_list.append(ttk.Frame(self.statisticsOptionsFrame))
-            self.options_frame_list[i].grid(row = i, column = 1)
             self.checkboxes_variable_list.append(tk.IntVar())
-            check_box = ttk.Checkbutton(self.options_frame_list[i], variable = self.checkboxes_variable_list[i])
-            check_box.grid(row = 0, column = 0)
+            check_box = ttk.Checkbutton(self.statisticsOptionsFrame, variable = self.checkboxes_variable_list[i])
+            check_box.grid(row = i, column = 1)
             if view_component != None:
                 # Create another frame for the view component
-                tmp_frame = ttk.Frame(self.options_frame_list[i])
+                tmp_frame = ttk.Frame(self.statisticsOptionsFrame)
                 #place it next to the checkbox
-                tmp_frame.grid(row = i, column = 1)
-                view_component(tmp_frame)
-                view_component.create_view()
+                tmp_frame.grid(row = i, column = 2, padx = 10)
+                view_component.create_view(tmp_frame, view_filters_list)
         #Create query button, the command is binded by the controller
-        self.statistics_button = ttk.Button(self.statisticsOptionsFrame, text = 'Gerar estatísticas')
-        self.statistics_button.grid(row = i + 1, column = 0, columnspan = 2, pady = 20)
+        self.statistics_button = ttk.Button(self, text = 'Gerar estatísticas')
+        self.statistics_button.grid(row = 2, column = 0, pady = 20)
 
     def get_selected_models(self):
         selected_models_name = []
@@ -511,15 +540,19 @@ class StatisticsOptionsView(View):
 
         Inputs:
         output_dict: A dictionary, where the key is the name of the model and the items are its content:
-        # a list of strings and images
+        a list of strings and images
         '''
         final_output = []
 
         # Header
         header_label = ttk.Label(self, text = 'Estatísticas:', style = "Subtitle.TLabel")
-        header_label.grid(row = 2, column = 0, pady =  20)
+        header_label.grid(row = 3, column = 0, pady =  20)
 
         # Frame for the results
+        if self.statisticsResultsFrame != None:
+            # there are results being shown already
+            self.statisticsResultsFrame.grid_forget()
+            self.statisticsResultsFrame.destroy()
         self.statisticsResultsFrame = ttk.Frame(self)
         self.statisticsResultsFrame.grid(row = 3, column = 0)
 
@@ -533,10 +566,30 @@ class StatisticsOptionsView(View):
             label.grid(row = 0)
 
             # Result box
-            text_box = tk.Text(frame, width = 150, height = 2*len(model_output))
-            text_box.tag_config('center', justify = tk.CENTER, wrap = None)
+            height = 3*len(model_output)
+            text_box = tk.Text(frame, width = 150, height = height)
+            text_box.tag_config('left', justify = tk.LEFT, wrap = None)
             text_box.grid(row = 1)
-            text_box.insert(tk.END,model_output,'center')
+            for line in model_output:
+                if line.endswith('.png') or line.endswith('.jpeg'):
+                    # It's a image path
+                    global my_image
+                    my_image = tk.PhotoImage(file = line)
+                    text_box.image_create(tk.END, image = my_image)
+                    # resize so the image can be seen
+                    height = height = 30
+                    text_box.config(height = height)
+
+                    # download image button
+                    def download_handler(self=self, image = my_image, image_path = line):
+                        return self.download_image(image,image_path)
+                    text_box.window_create(tk.END, window = ttk.Button(text_box, text = 'Baixar imagem',command = download_handler))
+                elif isinstance(line,str):
+                    text_box.insert(tk.END,line,'left')
+                else:
+                    raise TypeError('Models output list must contain only strings (Text) or path to png/jpeg image')
+                text_box.insert(tk.END,'\n','left')
+
             # Read only
             text_box.config(state=tk.DISABLED)
 
@@ -546,6 +599,11 @@ class StatisticsOptionsView(View):
             def handler(event, self=self, output = (model_name, model_output)):
                 return self.generate_pdf(event,output)
             export_button.bind("<Button-1>", handler)
+
+    def download_image(self,image,image_path):
+        save_directory = tk.filedialog.askdirectory(mustexist = True, title = 'Selecione o diretório em que deseja salvar a imagem')
+        file_name = (image_path.split('/'))[-1]
+        image.write(save_directory+'/'+file_name)
 
     def generate_pdf(self, event, output):
         model_name = output[0]
@@ -568,8 +626,97 @@ class StatisticsOptionsView(View):
                 # It's a png image
                 pdf.image(printable, x = -0.5, w = pdf.w+1)
             elif isinstance(printable,str):
-                pdf.multi_cell(0,6,printable, ln = True, align='R')
+                pdf.multi_cell(0,6,printable, ln = True, align='L')
             else:
                 raise TypeError('Models output list must contain only strings (Text) or path to png/jpeg image')
-                
-        pdf.output('veritas_'+model_name+'.pdf')
+
+        save_directory = tk.filedialog.askdirectory(mustexist = True, title = 'Selecione o diretório em que deseja salvar o PDF')
+        pdf.output(save_directory+'/veritas_'+model_name+'.pdf')
+
+class CountDocumentsView(ComponentView):
+    def __init__(self):
+        super().__init__()
+        self.parent = None
+        self.selection_list = []
+
+    def create_view(self,parent, view_filters_list):
+        self.parent = parent
+        self.label = ttk.Label(parent, text = 'Contar por:', style = 'Std.TLabel')
+        self.label.grid(row = 0, column = 0)
+
+        # frame for the comboboxes
+        self.combobox_frame = ttk.Frame(parent)
+        self.combobox_frame.grid(row = 0, column = 1, padx = 10)
+
+        self.create_combobox(self.combobox_frame, width = 10, font = self.verytiny_font,justify = 'right', state = 'readonly', values = view_filters_list)
+
+    def get_extra_input(self):
+        return [x.get() for x in self.selection_list]
+
+    def create_combobox(self, parent, width, font, justify, state, values):
+        #add a empty option
+        add_empty_values = values.copy()
+        if '' not in add_empty_values:
+            add_empty_values.insert(0,'')
+        # create a variable to hold the selected value
+        var = tk.StringVar()
+        self.selection_list.append(var)
+        newCombobox = ttk.Combobox(parent,textvariable = var, width = width, font = font, justify = justify, state = state, values = add_empty_values)
+        newCombobox.bind('<Button-1>',self.combo_configure)
+        column = len(parent.grid_slaves(row = 0))
+        newCombobox.grid(row = 0, column = column, padx = 10,sticky = tk.E)
+
+        #create button to add one more filter option
+        add_button = ttk.Button(parent, text = '+')
+        add_button.bind('<Button-1>',self.create_combobox_button)
+        add_button.grid(row = 0, column = column + 1, padx = 10)
+
+        #create delete filter option button if its not the first filter
+        if (column > 0):
+            delete_button = ttk.Button(parent, text = '-')
+            delete_button.bind('<Button-1>',self.delete_combobox_button)
+            delete_button.grid(row = 0, column = column + 2)
+
+    #add one more combobox when the button is clicked
+    def create_combobox_button(self,event):
+        button = event.widget
+        parent = button.nametowidget(button.winfo_parent())
+        if len(parent.grid_slaves(row = 0)) > 2:
+            #there is a delete button already, so it has to be deleted before creating another one
+            last_box_column = len(parent.grid_slaves(row = 0)) - 3
+            delete_button_column  = len(parent.grid_slaves(row = 0)) - 1
+            delete_button = (parent.grid_slaves(row = 0, column = delete_button_column))[0]
+            delete_button.destroy()
+        else:
+            last_box_column = len(parent.grid_slaves(row = 0)) - 2
+        last_box = (parent.grid_slaves(row = 0, column = last_box_column))[0]
+        font = last_box.cget('font')
+        width = last_box.cget('width')
+        justify = last_box.cget('justify')
+        state = last_box.cget('state')
+        values = list(last_box.cget('values'))
+
+        button.destroy()
+        self.create_combobox(parent, width = width, font = font, justify = justify, state = state, values = values)
+
+    def delete_combobox_button(self, event):
+        button = event.widget
+        parent = button.nametowidget(button.winfo_parent())
+        last_box_column = len(parent.grid_slaves(row = 0)) - 3
+        last_box = (parent.grid_slaves(row = 0, column = last_box_column))[0]
+        if last_box_column == 1:
+            button.destroy()
+        last_box.destroy()
+        del self.selection_list[-1]
+
+    #Configure combobox so its size adapts to its values
+    def combo_configure(self,event):
+        combo = event.widget
+        style = ttk.Style()
+
+        max_string = max(combo.cget('values'), key=len)
+        font = combo.cget('font')
+        width = tk.font.Font(font = font).measure(max_string + '0000' ) - combo.winfo_width()
+
+        style.configure('TCombobox', postoffset=(0,0,width,0))
+        combo.configure(style='TCombobox')

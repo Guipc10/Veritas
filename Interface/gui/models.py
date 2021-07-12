@@ -192,7 +192,7 @@ class TestModel(ComponentModel):
         cwd = os.getcwd()
         fig.savefig(cwd+'/images/fig1.png')
         img_path = cwd+'/images/fig1.png'
-        return ['test_output', img_path]
+        return ['test_output', img_path, 'eaiii']
 
 class CountDocuments(ComponentModel):
     def __init__(self):
@@ -202,7 +202,7 @@ class CountDocuments(ComponentModel):
         return 'Count Documents'
 
     def requires_extra_input(self):
-        return False
+        return True
 
     def execute(self, data, extra_input):
         '''
@@ -212,29 +212,13 @@ class CountDocuments(ComponentModel):
         df = pd.DataFrame.from_records(data)
         total_documents = len(df)
         output.append('Número total de documentos: ' + str(total_documents))
-        for column in df[:len(df)-1]:
-            grouped_count = df.groupby(column).count()
-            # GETS AN ERROR WHEN THE DATA HAS ONLY ONE COLUMN
-            if len(grouped_count.columns) > 1:
-                one_column_frame = grouped_count[grouped_count.columns[0]]
-            else:
-                one_column_frame = grouped_count
-
-            output.append('\nNúmero de documentos por: ' + str(column))
-
-            frame = pd.DataFrame(one_column_frame)
-            # Rename the columns and create a new column with the relative number of documents
-            frame.columns = ['Absoluto']
-            if column != 'julgado':
-                relative = []
-                for i in range(len(frame)):
-                    relative.append(frame.iloc[i,0]/total_documents)
-                print(f'len frame {len(frame)}, len relative {len(relative)}')
-                frame['Relativo'] = relative
-                output.append(frame.to_string(justify='right'))
-                print(frame.to_string())
+        for column in extra_input:
+            if column in df.columns:
+                output.append('\nNúmero de documentos por: ' + str(column))
+                absolute_count = df[column].value_counts()
+                relative_count = df[column].value_counts(normalize = True)
+                tmp_df = pd.DataFrame({'Absoluto': absolute_count, 'Relativo' : relative_count})
+                output.append(tmp_df.to_string(justify='right'))
+                output.append('\n')
 
         return output
-        # grouped = df.groupby('classe')
-        # count = grouped.count()
-        # print(count['processo'])
