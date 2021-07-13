@@ -87,12 +87,18 @@ class StatisticsController(Controller):
     def call_view(self, parent, filters_dict, view_filters_list):
         self.statistics_options_view_list.append(StatisticsOptionsView(parent, None))
         self.statistics_options_view_list[len(self.statistics_options_view_list)-1].create_view()
+        models_descriptions = self.get_all_models_description()
         self.statistics_options_view_list[len(self.statistics_options_view_list)-1].set_filters(filters_dict, view_filters_list)
-        self.statistics_options_view_list[len(self.statistics_options_view_list)-1].create_statistics_options(self.models_view_dict, view_filters_list)
+        self.statistics_options_view_list[len(self.statistics_options_view_list)-1].create_statistics_options(self.models_view_dict, models_descriptions, view_filters_list)
         def handler(event, self=self, i=(len(self.statistics_options_view_list)-1)):
             return self.generate_statistics(event,i)
         self.statistics_options_view_list[len(self.statistics_options_view_list)-1].statistics_button.bind('<Button-1>', handler)
 
+    def get_all_models_description(self):
+        all_descriptions = {}
+        for model_name, model in self.models_dict.items():
+            all_descriptions[model_name] = model.get_description()
+        return all_descriptions
 
     def generate_statistics(self, event, options_view_index):
         #get a list of names of the models that are going to be used

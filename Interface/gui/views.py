@@ -9,6 +9,8 @@ from gui.util.helper_classes import ScrollFrame
 import pandas as pd
 
 
+SMALL_BUTTON_WIDTH = 3
+
 class View(ttk.Frame):
     @abstractmethod
     def create_view():
@@ -261,13 +263,13 @@ class LoadFilesView(View):
         newCombobox.grid(row = 0, column = column, padx = 10,sticky = tk.E)
 
         #create button to add one more filter option
-        add_button = ttk.Button(parent, text = '+')
+        add_button = ttk.Button(parent, text = '+', width = SMALL_BUTTON_WIDTH)
         add_button.bind('<Button-1>',self.create_combobox_button)
         add_button.grid(row = 0, column = column + 1, padx = 10)
 
         #create delete filter option button if its not the first filter
         if (column > 0):
-            delete_button = ttk.Button(parent, text = '-')
+            delete_button = ttk.Button(parent, text = '-', width = SMALL_BUTTON_WIDTH)
             delete_button.bind('<Button-1>',self.delete_combobox_button)
             delete_button.grid(row = 0, column = column + 2)
 
@@ -471,6 +473,7 @@ class StatisticsOptionsView(View):
         self.button_font = ('Helvetica',10)
         self.verytiny_font = ('Helvetica',8)
         self.style.configure("TButton",background=self.background, font = self.button_font)
+        self.style.configure("Bold.TButton",background=self.background, font = ('Helvetica',10,'bold'))
         self.style.configure("TFrame",background=self.background)
         self.style.configure("TLabel",background=self.background,font=self.std_font)
         self.style.configure("Subtitle.TLabel",background=self.background,font=('Helvetica',15,'bold'))
@@ -509,22 +512,37 @@ class StatisticsOptionsView(View):
 
     # Create the query options based on the parameter models_view_dict, if no view frame is given then just the standard
     # checkbox with the model's name will be created
-    def create_statistics_options(self, models_view_dict, view_filters_list):
+    def create_statistics_options(self, models_view_dict, models_descriptions, view_filters_list):
         for i,(model_name, view_component) in enumerate(models_view_dict.items()):
+            # Help button
+            def handler(self=self,model_name = model_name, description = models_descriptions[model_name]):
+                return self.show_help_window(description,model_name)
+            help_button = ttk.Button(self.statisticsOptionsFrame, text = '?', command = handler, width = SMALL_BUTTON_WIDTH, style='Bold.TButton')
+            help_button.grid(row = i, column = 0)
+
+            # Label
             self.options_label_list.append(ttk.Label(self.statisticsOptionsFrame, text = model_name))
-            self.options_label_list[i].grid(row = i, column = 0, padx = 10)
+            self.options_label_list[i].grid(row = i, column = 1, padx = 10)
+
+            # Checkbox
             self.checkboxes_variable_list.append(tk.IntVar())
             check_box = ttk.Checkbutton(self.statisticsOptionsFrame, variable = self.checkboxes_variable_list[i])
-            check_box.grid(row = i, column = 1)
+            check_box.grid(row = i, column = 2)
+
+            # individual view frame
             if view_component != None:
                 # Create another frame for the view component
                 tmp_frame = ttk.Frame(self.statisticsOptionsFrame)
                 #place it next to the checkbox
-                tmp_frame.grid(row = i, column = 2, padx = 10)
+                tmp_frame.grid(row = i, column = 3, padx = 10)
                 view_component.create_view(tmp_frame, view_filters_list)
+
         #Create query button, the command is binded by the controller
         self.statistics_button = ttk.Button(self, text = 'Gerar estatísticas')
         self.statistics_button.grid(row = 2, column = 0, pady = 20)
+
+    def show_help_window(self, model_description, model_name):
+        tk.messagebox.showinfo(model_name, model_description)
 
     def get_selected_models(self):
         selected_models_name = []
@@ -667,13 +685,13 @@ class CountDocumentsView(ComponentView):
         newCombobox.grid(row = 0, column = column, padx = 10,sticky = tk.E)
 
         #create button to add one more filter option
-        add_button = ttk.Button(parent, text = '+')
+        add_button = ttk.Button(parent, text = '+', width = SMALL_BUTTON_WIDTH)
         add_button.bind('<Button-1>',self.create_combobox_button)
         add_button.grid(row = 0, column = column + 1, padx = 10)
 
         #create delete filter option button if its not the first filter
         if (column > 0):
-            delete_button = ttk.Button(parent, text = '-')
+            delete_button = ttk.Button(parent, text = '-', width = SMALL_BUTTON_WIDTH)
             delete_button.bind('<Button-1>',self.delete_combobox_button)
             delete_button.grid(row = 0, column = column + 2)
 

@@ -29,6 +29,16 @@ class ComponentModel():
         raise NotImplementedError
 
     @abstractmethod
+    def get_description():
+        '''
+        Returns a description of the model to be shown when the user clicks the help button
+
+        Outputs:
+        - String describing the model
+        '''
+        raise NotImplementedError
+
+    @abstractmethod
     def execute(data, extra_input = None):
         '''
         This method executes it's algorithm on the given data
@@ -84,7 +94,7 @@ class LoadFilesModel():
 
         self.all_keys = list(self.key_to_possible_values_dic.keys()).copy()
 
-        UNIQUE_KEYS = ['ementa', 'processo', 'cdacordao', 'julgado']
+        UNIQUE_KEYS = ['ementa', 'processo', 'cdacordao', 'julgado', 'pagina', 'duplicado', 'cd_doc']
         #remove useless keys from the metadata
         for useless_key in UNIQUE_KEYS:
             if useless_key in self.key_to_possible_values_dic.keys():
@@ -92,7 +102,12 @@ class LoadFilesModel():
 
         #sort it alphabetically
         for key in self.key_to_possible_values_dic.keys():
-            self.key_to_possible_values_dic[key] = sorted(self.key_to_possible_values_dic[key],key= str.lower)
+            for value in self.key_to_possible_values_dic[key]:
+                break
+            if isinstance(value,int):
+                self.key_to_possible_values_dic[key] = sorted(self.key_to_possible_values_dic[key])
+            elif isinstance(value,str):
+                self.key_to_possible_values_dic[key] = sorted(self.key_to_possible_values_dic[key],key= str.lower)
 
         return self.all_keys, self.key_to_possible_values_dic
 
@@ -135,7 +150,7 @@ class LoadFilesModel():
                     else:
                         if key != 'processo':
                         # processo is a useless key to filter but may cause overflow in the date check
-                            if not self.is_date(value):
+                            if not self.is_date(str(value)):
                                 # it's  not a date
                                 if key in filters_dict.keys():
                                     # key may has been filtered
@@ -186,6 +201,9 @@ class TestModel(ComponentModel):
     def requires_extra_input(self):
         return False
 
+    def get_description(self):
+        return 'teste'
+
     def execute(self, data, extra_input = None):
         fig,ax = plt.subplots()
         ax.plot([1,2,3],[1,2,3])
@@ -204,6 +222,9 @@ class CountDocuments(ComponentModel):
     def requires_extra_input(self):
         return True
 
+    def get_description(self):
+        return 'Realiza a contagem dos documentos em relação às categorias escolhidas, os resultados incluem contagem absoluta e contagem relativa.'
+
     def execute(self, data, extra_input):
         '''
         This module's required extra input is a list containing the categories on where the count in going to be made
@@ -218,6 +239,13 @@ class CountDocuments(ComponentModel):
                 absolute_count = df[column].value_counts()
                 relative_count = df[column].value_counts(normalize = True)
                 tmp_df = pd.DataFrame({'Absoluto': absolute_count, 'Relativo' : relative_count})
+                # fig, ax = plt.subplots(figsize=(12,4))
+                # ax.axis('tight')
+                # ax.axis('off')
+                # table = ax.table(cellText = df.values, colLabels = df.columns, loc='center')
+                # cwd = os.getcwd()
+                # fig.savefig(cwd+'/images/fig2.png')
+                #tmp_df.sort_index(inplace = True)
                 output.append(tmp_df.to_string(justify='right'))
                 output.append('\n')
 
