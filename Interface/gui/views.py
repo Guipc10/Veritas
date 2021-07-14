@@ -7,10 +7,10 @@ from fpdf import FPDF
 from dateutil.parser import parse
 from gui.util.helper_classes import ScrollFrame
 import pandas as pd
-
+import pandastable as pdt
 
 SMALL_BUTTON_WIDTH = 3
-
+TEXT_WIDGET_WIDTH = 190
 class View(ttk.Frame):
     @abstractmethod
     def create_view():
@@ -23,7 +23,7 @@ class ComponentView():
         '''
         self.style = ttk.Style()
         self.background = 'white'
-        self.std_font = ('Helvetica',12)
+        self.std_font = ('Helvetica',10)
         self.button_font = ('Helvetica',10)
         self.verytiny_font = ('Helvetica',8)
         self.style.configure("Std.TButton",background=self.background, font = self.button_font)
@@ -367,6 +367,7 @@ class QueryView(View):
         self.style.configure("Close.TButton",background=self.background, font=('Helvetica',10,'bold'))
         self.style.configure("Download.TButton",background=self.background,size=(12,12))
         self.style.configure("TFrame",background=self.background)
+        self.style.configure("Red.TFrame",background='red')
         self.style.configure("TLabel",background=self.background,font=self.std_font)
         self.style.configure("NumberofFiles.TLabel",background=self.background,font=('Helvetica',10,'bold'))
         self.style.configure("Tiny.TLabel",background=self.background,font=('Helvetica',10))
@@ -423,18 +424,38 @@ class QueryView(View):
         header.grid(row = 0, pady = 20)
 
         # Show a sample of the data
+        table_frame = ttk.Frame(main_frame, width = 1500, height = 500)
+        table_frame.grid(row = 1, padx = 20)
+        table_frame.grid_propagate(0)
         df = pd.DataFrame.from_records(data)
-        txt = tk.Text(main_frame, width = 100, height = 15)
-        txt.tag_config('center', justify = tk.CENTER, wrap = None)
-        txt.grid(row = 1)
-        txt.insert(tk.END,df,'center')
-        # Read only
-        txt.config(state=tk.DISABLED)
+        table = pdt.Table(table_frame, showtoolbar = False, showstatusbar = False, width = 500)
+        table.model.df = df
+        options = {'align': 'w',
+                 'cellbackgr': 'white',
+                 'cellwidth': 80,
+                 'colheadercolor': 'gray',
+                 'floatprecision': 2,
+                 'font': 'Helvetica',
+                 'fontsize': 10,
+                 'fontstyle': '',
+                 'grid_color': '#ABB1AD',
+                 'linewidth': 1,
+                 'rowheight': 22,
+                 'rowselectedcolor': '#E4DED4',
+                 'textcolor': 'black'}
+        pdt.config.apply_options(options,table)
+        table.show()
+        # txt = tk.Text(main_frame, width = TEXT_WIDGET_WIDTH, height = 15, wrap=tk.NONE)
+        # txt.tag_config('center', justify = tk.CENTER, wrap = None)
+        # txt.grid(row = 1)
+        # txt.insert(tk.END,str(df.head(20)),'center')
+        # # Read only
+        # txt.config(state=tk.DISABLED)
 
         # Info label
         n_rows = df.shape[0]
         n_columns = df.shape[1]
-        info_label = ttk.Label(main_frame, text = f'Há {n_rows} documentos nesta consulta e o número de metadados de cada um é {n_columns}.')
+        info_label = ttk.Label(main_frame, text = f'Há {n_rows} documentos nesta consulta e o número de atributos selecionados é {n_columns}.')
         info_label.grid(row = 2, pady = 10)
 
         # Buttons
@@ -584,8 +605,8 @@ class StatisticsOptionsView(View):
             label.grid(row = 0)
 
             # Result box
-            height = 3*len(model_output)
-            text_box = tk.Text(frame, width = 150, height = height)
+            height = 3*len(model_output) + 20
+            text_box = tk.Text(frame, width = TEXT_WIDGET_WIDTH, height = height)
             text_box.tag_config('left', justify = tk.LEFT, wrap = None)
             text_box.grid(row = 1)
             for line in model_output:
@@ -656,21 +677,61 @@ class CountDocumentsView(ComponentView):
         super().__init__()
         self.parent = None
         self.selection_list = []
+        self.histogram_select_variable = tk.IntVar()
+        self.histogram_n_variable = tk.StringVar()
 
     def create_view(self,parent, view_filters_list):
         self.parent = parent
-        self.label = ttk.Label(parent, text = 'Contar por:', style = 'Std.TLabel')
+
+        # Category selection frame
+        self.category_selec_frame = ttk.Frame(parent)
+        self.category_selec_frame.grid(row = 0, column = 0, sticky = tk.W)
+
+        self.label = ttk.Label(self.category_selec_frame, text = 'Contar por:', style = 'Std.TLabel')
         self.label.grid(row = 0, column = 0)
 
         # frame for the comboboxes
-        self.combobox_frame = ttk.Frame(parent)
+        self.combobox_frame = ttk.Frame(self.category_selec_frame)
         self.combobox_frame.grid(row = 0, column = 1, padx = 10)
 
         self.create_combobox(self.combobox_frame, width = 10, font = self.verytiny_font,justify = 'right', state = 'readonly', values = view_filters_list)
 
-    def get_extra_input(self):
-        return [x.get() for x in self.selection_list]
+        # histogram options
+        self.his_frame = ttk.Frame(parent)
+        self.his_frame.grid(row = 1, column = 0, pady = 5, sticky = tk.W)
 
+        self.his_label = ttk.Label(self.his_frame, text = 'Gerar histograma', style = 'Std.TLabel')
+        self.his_label.grid(row = 0, column = 0)
+
+        self.hist_checkbox = ttk.Checkbutton(self.his_frame, variable = self.histogram_select_variable, command = self.show_hide_hist_options)
+        self.hist_checkbox.grid(row = 0, column = 1, padx = 10)
+
+        self.hist_options_frame = ttk.Frame(self.his_frame)
+        self.hist_options_frame.grid(row = 0, column = 2)
+        self.hist_options_label1 = ttk.Label(self.hist_options_frame, text = '- Considerar as ', style = 'Std.TLabel')
+        self.hist_options_label1.grid(row = 0, column = 0)
+        self.hist_options_entry = ttk.Entry(self.hist_options_frame, textvariable = self.histogram_n_variable, width = 4)
+        self.hist_options_entry.grid(row = 0, column = 1)
+        self.hist_options_label2 = ttk.Label(self.hist_options_frame, text = ' aparições mais frequentes. ', style = 'Std.TLabel')
+        self.hist_options_label2.grid(row = 0, column = 2)
+
+        # hide frame so its shown only when the user selects the checkbox
+        self.hist_options_frame.grid_remove()
+
+    def show_hide_hist_options(self):
+        if self.histogram_select_variable.get() == 1:
+            self.hist_options_frame.grid()
+        else:
+            self.hist_options_frame.grid_remove()
+
+    def get_extra_input(self):
+        extra_input = {}
+        extra_input['selected_categories'] = [x.get() for x in self.selection_list]
+        extra_input['histogram_selected'] = self.histogram_select_variable.get()
+        extra_input['histogram_n'] = int(self.histogram_n_variable.get())
+
+        return extra_input
+        
     def create_combobox(self, parent, width, font, justify, state, values):
         #add a empty option
         add_empty_values = values.copy()

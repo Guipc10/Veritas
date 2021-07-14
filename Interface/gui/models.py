@@ -153,7 +153,7 @@ class LoadFilesModel():
                             if not self.is_date(str(value)):
                                 # it's  not a date
                                 if key in filters_dict.keys():
-                                    # key may has been filtered
+                                    # key may have been filtered
                                     if not self.filter_is_empty(filters_dict[key]):
                                         # filter for this key is not empty
                                         if value not in filters_dict[key]:
@@ -182,14 +182,16 @@ class LoadFilesModel():
         data = self.apply_filters(filters_dict, view_filters_list)
         df = pd.DataFrame.from_records(data)
         save_directory = tk.filedialog.askdirectory(mustexist = True, title = 'Selecione o diretório em que deseja salvar o arquivo CSV')
-        df.to_csv(save_directory + '/veritas_consulta' + str(index) + '.csv', encoding='utf-8')
+        if not save_directory == '':
+            df.to_csv(save_directory + '/veritas_consulta' + str(index) + '.csv', encoding='utf-8')
 
     def save_json(self, filters_dict, view_filters_list, index):
         data = self.apply_filters(filters_dict, view_filters_list)
         df = pd.DataFrame.from_records(data)
         save_directory = tk.filedialog.askdirectory(mustexist = True, title = 'Selecione o diretório em que deseja salvar o arquivo JSON')
-        with open(save_directory + '/veritas_consulta' + str(index) + '.json', 'w', encoding='utf-8') as file:
-            df.to_json(file, orient='records', force_ascii=False)
+        if not save_directory == '':
+            with open(save_directory + '/veritas_consulta' + str(index) + '.json', 'w', encoding='utf-8') as file:
+                df.to_json(file, orient='records', force_ascii=False)
 
 class TestModel(ComponentModel):
     def __init__(self):
@@ -223,8 +225,9 @@ class CountDocuments(ComponentModel):
         return True
 
     def get_description(self):
-        return 'Realiza a contagem dos documentos em relação às categorias escolhidas, os resultados incluem contagem absoluta e contagem relativa.'
-
+        string =  'Realiza a contagem dos documentos em relação às categorias escolhidas, os resultados incluem contagem absoluta e contagem relativa. '
+        string += 'Para também um histograma das aparições mais frequentes selecione a opção "Gerar histograma".'
+        return string
     def execute(self, data, extra_input):
         '''
         This module's required extra input is a list containing the categories on where the count in going to be made
@@ -233,7 +236,8 @@ class CountDocuments(ComponentModel):
         df = pd.DataFrame.from_records(data)
         total_documents = len(df)
         output.append('Número total de documentos: ' + str(total_documents))
-        for column in extra_input:
+        print('select histotram é',extra_input['histogram_selected'],' n é', extra_input['histogram_n'])
+        for column in extra_input['selected_categories']:
             if column in df.columns:
                 output.append('\nNúmero de documentos por: ' + str(column))
                 absolute_count = df[column].value_counts()
