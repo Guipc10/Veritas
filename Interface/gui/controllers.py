@@ -17,6 +17,7 @@ class FilesController(Controller):
         # List of filters for each tab, each item is a tuple
         self.tab_filters_list = []
 
+
     def bind(self,view: View):
         if (isinstance(view, LoadFilesView)):
             self.load_files_view = view

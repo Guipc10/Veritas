@@ -10,7 +10,7 @@ import pandas as pd
 import pandastable as pdt
 
 SMALL_BUTTON_WIDTH = 3
-TEXT_WIDGET_WIDTH = 190
+TEXT_WIDGET_WIDTH = 160
 class View(ttk.Frame):
     @abstractmethod
     def create_view():
@@ -201,7 +201,7 @@ class LoadFilesView(View):
             # self.check_boxes_labels[i].grid(row = 2, column = i, pady = 20)
 
             self.view_filters_boxes_variables[key] = tk.IntVar()
-            self.check_boxes.append(ttk.Checkbutton(self.checkboxesFrame, variable = self.view_filters_boxes_variables[key], text = key))
+            self.check_boxes.append(ttk.Checkbutton(self.checkboxesFrame, variable = self.view_filters_boxes_variables[key], text = key.capitalize()))
             self.check_boxes[i].grid(row = 0, column = i, pady = 20, padx = 10)
             self.view_filters_boxes_variables[key].set(1)
 
@@ -215,7 +215,7 @@ class LoadFilesView(View):
         self.filtersSelection = []
 
         for i,key in enumerate(key_to_possible_values_dic.keys()):
-            self.filtersLabel.append(ttk.Label(self.selectionfiltersFrame, text = key, justify = tk.RIGHT))
+            self.filtersLabel.append(ttk.Label(self.selectionfiltersFrame, text = key.capitalize(), justify = tk.RIGHT))
             self.filtersLabel[i].grid(row=i, column=0, sticky = tk.E, padx = 10)
             self.filtersComboboxFrames.append(ttk.Frame(self.selectionfiltersFrame))
             self.filtersComboboxFrames[i].grid(row = i, column = 1, pady = 2, sticky = tk.W)
@@ -608,6 +608,7 @@ class StatisticsOptionsView(View):
             height = 3*len(model_output) + 20
             text_box = tk.Text(frame, width = TEXT_WIDGET_WIDTH, height = height)
             text_box.tag_config('left', justify = tk.LEFT, wrap = None)
+            text_box.tag_config('center', justify = tk.CENTER, wrap = None)
             text_box.grid(row = 1)
             for line in model_output:
                 if line.endswith('.png') or line.endswith('.jpeg'):
@@ -622,6 +623,8 @@ class StatisticsOptionsView(View):
                     # download image button
                     def download_handler(self=self, image = my_image, image_path = line):
                         return self.download_image(image,image_path)
+                    last_line_init = text_box.get('end-1c linestart')
+                    print(len(last_line_init))
                     text_box.window_create(tk.END, window = ttk.Button(text_box, text = 'Baixar imagem',command = download_handler))
                 elif isinstance(line,str):
                     text_box.insert(tk.END,line,'left')
@@ -641,8 +644,9 @@ class StatisticsOptionsView(View):
 
     def download_image(self,image,image_path):
         save_directory = tk.filedialog.askdirectory(mustexist = True, title = 'Selecione o diretório em que deseja salvar a imagem')
-        file_name = (image_path.split('/'))[-1]
-        image.write(save_directory+'/'+file_name)
+        if not save_directory == '':
+            file_name = (image_path.split('/'))[-1]
+            image.write(save_directory+'/'+file_name)
 
     def generate_pdf(self, event, output):
         model_name = output[0]
@@ -700,7 +704,7 @@ class CountDocumentsView(ComponentView):
         self.his_frame = ttk.Frame(parent)
         self.his_frame.grid(row = 1, column = 0, pady = 5, sticky = tk.W)
 
-        self.his_label = ttk.Label(self.his_frame, text = 'Gerar histograma', style = 'Std.TLabel')
+        self.his_label = ttk.Label(self.his_frame, text = 'Gerar gráfico de barras', style = 'Std.TLabel')
         self.his_label.grid(row = 0, column = 0)
 
         self.hist_checkbox = ttk.Checkbutton(self.his_frame, variable = self.histogram_select_variable, command = self.show_hide_hist_options)
@@ -710,6 +714,7 @@ class CountDocumentsView(ComponentView):
         self.hist_options_frame.grid(row = 0, column = 2)
         self.hist_options_label1 = ttk.Label(self.hist_options_frame, text = '- Considerar as ', style = 'Std.TLabel')
         self.hist_options_label1.grid(row = 0, column = 0)
+        self.histogram_n_variable.set('')
         self.hist_options_entry = ttk.Entry(self.hist_options_frame, textvariable = self.histogram_n_variable, width = 4)
         self.hist_options_entry.grid(row = 0, column = 1)
         self.hist_options_label2 = ttk.Label(self.hist_options_frame, text = ' aparições mais frequentes. ', style = 'Std.TLabel')
@@ -729,9 +734,12 @@ class CountDocumentsView(ComponentView):
         extra_input['selected_categories'] = [x.get() for x in self.selection_list]
         extra_input['histogram_selected'] = self.histogram_select_variable.get()
         extra_input['histogram_n'] = int(self.histogram_n_variable.get())
-
+        if (extra_input['histogram_selected'] == 1 and extra_input['histogram_n'] == ''):
+            tk.messagebox.showerror('Erro', 'Digite quantas aparições mais frequentes você deseja que tenha no gráfico.')
+            # Won't show the plot
+            extra_input['histogram_selected'] = 0
         return extra_input
-        
+
     def create_combobox(self, parent, width, font, justify, state, values):
         #add a empty option
         add_empty_values = values.copy()

@@ -226,8 +226,12 @@ class CountDocuments(ComponentModel):
 
     def get_description(self):
         string =  'Realiza a contagem dos documentos em relação às categorias escolhidas, os resultados incluem contagem absoluta e contagem relativa. '
-        string += 'Para também um histograma das aparições mais frequentes selecione a opção "Gerar histograma".'
+        string += 'Para gerar também um gráfico de barras das aparições mais frequentes selecione a opção "Gerar gráfico de barras".'
         return string
+
+    def insert_linebreak(self,string, lengLabel=20):
+        return '\n'.join(string[i:i+lengLabel] for i in range(0, len(string), lengLabel))
+
     def execute(self, data, extra_input):
         '''
         This module's required extra input is a list containing the categories on where the count in going to be made
@@ -236,21 +240,30 @@ class CountDocuments(ComponentModel):
         df = pd.DataFrame.from_records(data)
         total_documents = len(df)
         output.append('Número total de documentos: ' + str(total_documents))
-        print('select histotram é',extra_input['histogram_selected'],' n é', extra_input['histogram_n'])
         for column in extra_input['selected_categories']:
             if column in df.columns:
                 output.append('\nNúmero de documentos por: ' + str(column))
                 absolute_count = df[column].value_counts()
                 relative_count = df[column].value_counts(normalize = True)
                 tmp_df = pd.DataFrame({'Absoluto': absolute_count, 'Relativo' : relative_count})
-                # fig, ax = plt.subplots(figsize=(12,4))
-                # ax.axis('tight')
-                # ax.axis('off')
-                # table = ax.table(cellText = df.values, colLabels = df.columns, loc='center')
-                # cwd = os.getcwd()
-                # fig.savefig(cwd+'/images/fig2.png')
-                #tmp_df.sort_index(inplace = True)
                 output.append(tmp_df.to_string(justify='right'))
-                output.append('\n')
+                if extra_input['histogram_selected'] == 1:
+                    # add a line break so the names can be read
+                    tmp_df.index = tmp_df.index.map(self.insert_linebreak)
+
+                    output.append('\nGráfico das '+ str(extra_input['histogram_n'])+' aparições mais frequentes:')
+
+                    plt.rcParams['figure.figsize']=(12,5)
+                    plt.rcParams['font.size'] = 10.0
+
+                    tmp_df['Absoluto'].head(extra_input['histogram_n']).plot(kind='bar')
+                    plt.xlabel(column.capitalize())
+                    plt.ylabel('N° de documentos')
+                    plt.title(str(column.capitalize()+ 's mais frequentes'))
+                    plt.tight_layout()
+                    cwd = os.getcwd()
+                    plt.savefig(cwd+'/images/'+column+'.png')
+                    output.append(cwd+'/images/'+column+'.png')
+                output.append(160*'-')
 
         return output
