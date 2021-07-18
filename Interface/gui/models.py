@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # All new modules have to inherit from this class
+TEXT_WIDGET_WIDTH = 160
 class ComponentModel():
     @abstractmethod
     def get_name():
@@ -226,7 +227,7 @@ class CountDocuments(ComponentModel):
 
     def get_description(self):
         string =  'Realiza a contagem dos documentos em relação às categorias escolhidas, os resultados incluem contagem absoluta e contagem relativa. '
-        string += 'Para gerar também um gráfico de barras das aparições mais frequentes selecione a opção "Gerar gráfico de barras".'
+        string += 'Para gerar gráficos selecione alguns dos checkboxes disponíveis.'
         return string
 
     def insert_linebreak(self,string, lengLabel=20):
@@ -247,23 +248,38 @@ class CountDocuments(ComponentModel):
                 relative_count = df[column].value_counts(normalize = True)
                 tmp_df = pd.DataFrame({'Absoluto': absolute_count, 'Relativo' : relative_count})
                 output.append(tmp_df.to_string(justify='right'))
-                if extra_input['histogram_selected'] == 1:
+                if extra_input['bar_selected'] == 1:
                     # add a line break so the names can be read
-                    tmp_df.index = tmp_df.index.map(self.insert_linebreak)
+                    bar_df = tmp_df.copy()
+                    bar_df.index = bar_df.index.map(self.insert_linebreak)
 
-                    output.append('\nGráfico das '+ str(extra_input['histogram_n'])+' aparições mais frequentes:')
+                    output.append('\nGráfico de barras das '+ str(extra_input['bar_n'])+' aparições mais frequentes:')
 
-                    plt.rcParams['figure.figsize']=(12,5)
-                    plt.rcParams['font.size'] = 10.0
-
-                    tmp_df['Absoluto'].head(extra_input['histogram_n']).plot(kind='bar')
-                    plt.xlabel(column.capitalize())
-                    plt.ylabel('N° de documentos')
-                    plt.title(str(column.capitalize()+ 's mais frequentes'))
+                    bar_fig, bar_ax = plt.subplots()
+                    bar_fig.set_size_inches((12,6))
+                    plt.rcParams['font.size'] = 12.0
+                    bar_df['Absoluto'].head(extra_input['bar_n']).plot(kind='bar', ax=bar_ax)
+                    bar_ax.set_xlabel(column.capitalize())
+                    bar_ax.set_ylabel('N° de documentos')
+                    bar_ax.set_title(str(column.capitalize()+ 's mais frequentes'))
                     plt.tight_layout()
                     cwd = os.getcwd()
-                    plt.savefig(cwd+'/images/'+column+'.png')
-                    output.append(cwd+'/images/'+column+'.png')
-                output.append(160*'-')
+                    bar_fig.savefig(cwd+'/images/'+column+'_bar'+'.png')
+                    output.append(cwd+'/images/'+column+'_bar'+'.png')
+                if extra_input['pie_selected'] == 1:
+                    output.append('\nGráfico de pizza:')
+                    pie_fig, pie_ax = plt.subplots()
+                    pie_fig.set_size_inches((12,6))
+                    plt.rcParams['font.size'] = 12.0
+
+                    # Uses the relative count because its a pie chart
+                    tmp_df['Relativo'].plot(kind='pie', ax=pie_ax, autopct='%1.1f%%', textprops={'fontsize': 8}, normalize = True)
+                    pie_ax.set_title(str(column.capitalize()+ 's'))
+                    pie_ax.set_ylabel('')
+                    plt.tight_layout()
+                    cwd = os.getcwd()
+                    pie_fig.savefig(cwd+'/images/'+column+'_pie'+'.png')
+                    output.append(cwd+'/images/'+column+'_pie'+'.png')
+            output.append('-'*TEXT_WIDGET_WIDTH)
 
         return output

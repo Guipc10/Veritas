@@ -617,15 +617,16 @@ class StatisticsOptionsView(View):
                     my_image = tk.PhotoImage(file = line)
                     text_box.image_create(tk.END, image = my_image)
                     # resize so the image can be seen
-                    height = height = 30
+                    height = height + 20
                     text_box.config(height = height)
 
                     # download image button
+                    text_box.insert(tk.END,'\n')
                     def download_handler(self=self, image = my_image, image_path = line):
                         return self.download_image(image,image_path)
-                    last_line_init = text_box.get('end-1c linestart')
-                    print(len(last_line_init))
                     text_box.window_create(tk.END, window = ttk.Button(text_box, text = 'Baixar imagem',command = download_handler))
+                    # Centralize button and image
+                    text_box.tag_add('center','end-1l linestart','end')
                 elif isinstance(line,str):
                     text_box.insert(tk.END,line,'left')
                 else:
@@ -681,8 +682,10 @@ class CountDocumentsView(ComponentView):
         super().__init__()
         self.parent = None
         self.selection_list = []
-        self.histogram_select_variable = tk.IntVar()
-        self.histogram_n_variable = tk.StringVar()
+        self.bar_select_variable = tk.IntVar()
+        self.bar_n_variable = tk.StringVar()
+        self.pie_select_variable = tk.IntVar()
+        self.pie_n_variable = tk.StringVar()
 
     def create_view(self,parent, view_filters_list):
         self.parent = parent
@@ -700,44 +703,64 @@ class CountDocumentsView(ComponentView):
 
         self.create_combobox(self.combobox_frame, width = 10, font = self.verytiny_font,justify = 'right', state = 'readonly', values = view_filters_list)
 
-        # histogram options
+        # bar options
         self.his_frame = ttk.Frame(parent)
         self.his_frame.grid(row = 1, column = 0, pady = 5, sticky = tk.W)
 
         self.his_label = ttk.Label(self.his_frame, text = 'Gerar gráfico de barras', style = 'Std.TLabel')
         self.his_label.grid(row = 0, column = 0)
 
-        self.hist_checkbox = ttk.Checkbutton(self.his_frame, variable = self.histogram_select_variable, command = self.show_hide_hist_options)
-        self.hist_checkbox.grid(row = 0, column = 1, padx = 10)
+        self.bar_checkbox = ttk.Checkbutton(self.his_frame, variable = self.bar_select_variable, command = self.show_hide_bar_options)
+        self.bar_checkbox.grid(row = 0, column = 1, padx = 10, sticky = tk.E)
 
-        self.hist_options_frame = ttk.Frame(self.his_frame)
-        self.hist_options_frame.grid(row = 0, column = 2)
-        self.hist_options_label1 = ttk.Label(self.hist_options_frame, text = '- Considerar as ', style = 'Std.TLabel')
-        self.hist_options_label1.grid(row = 0, column = 0)
-        self.histogram_n_variable.set('')
-        self.hist_options_entry = ttk.Entry(self.hist_options_frame, textvariable = self.histogram_n_variable, width = 4)
-        self.hist_options_entry.grid(row = 0, column = 1)
-        self.hist_options_label2 = ttk.Label(self.hist_options_frame, text = ' aparições mais frequentes. ', style = 'Std.TLabel')
-        self.hist_options_label2.grid(row = 0, column = 2)
+        self.bar_options_frame = ttk.Frame(self.his_frame)
+        self.bar_options_frame.grid(row = 0, column = 2)
+        self.bar_options_label1 = ttk.Label(self.bar_options_frame, text = '- Considerar as ', style = 'Std.TLabel')
+        self.bar_options_label1.grid(row = 0, column = 0)
+        self.bar_n_variable.set('')
+        self.bar_options_entry = ttk.Entry(self.bar_options_frame, textvariable = self.bar_n_variable, width = 4)
+        self.bar_options_entry.grid(row = 0, column = 1)
+        self.bar_options_label2 = ttk.Label(self.bar_options_frame, text = ' aparições mais frequentes. ', style = 'Std.TLabel')
+        self.bar_options_label2.grid(row = 0, column = 2)
 
         # hide frame so its shown only when the user selects the checkbox
-        self.hist_options_frame.grid_remove()
+        self.bar_options_frame.grid_remove()
 
-    def show_hide_hist_options(self):
-        if self.histogram_select_variable.get() == 1:
-            self.hist_options_frame.grid()
+        # pie chart options
+        self.pie_frame = ttk.Frame(parent)
+        self.pie_frame.grid(row = 2, column = 0, pady = 5, sticky = tk.W)
+
+        self.pie_label = ttk.Label(self.pie_frame, text = 'Gerar gráfico de pizza', style = 'Std.TLabel')
+        self.pie_label.grid(row = 0, column = 0)
+
+        self.pie_checkbox = ttk.Checkbutton(self.pie_frame, variable = self.pie_select_variable)
+        self.pie_checkbox.grid(row = 0, column = 1, padx = 10, sticky = tk.E)
+
+    def show_hide_bar_options(self):
+        if self.bar_select_variable.get() == 1:
+            self.bar_options_frame.grid()
         else:
-            self.hist_options_frame.grid_remove()
+            self.bar_options_frame.grid_remove()
 
     def get_extra_input(self):
         extra_input = {}
         extra_input['selected_categories'] = [x.get() for x in self.selection_list]
-        extra_input['histogram_selected'] = self.histogram_select_variable.get()
-        extra_input['histogram_n'] = int(self.histogram_n_variable.get())
-        if (extra_input['histogram_selected'] == 1 and extra_input['histogram_n'] == ''):
-            tk.messagebox.showerror('Erro', 'Digite quantas aparições mais frequentes você deseja que tenha no gráfico.')
+        extra_input['bar_selected'] = self.bar_select_variable.get()
+
+        # Handle missing n entry
+        # Bar graph
+        if (extra_input['bar_selected'] == 1 and self.bar_n_variable.get() == ''):
+            tk.messagebox.showerror('Erro', 'Digite quantas aparições mais frequentes você deseja que tenha no gráfico de barras.')
             # Won't show the plot
-            extra_input['histogram_selected'] = 0
+            extra_input['bar_selected'] = 0
+        elif extra_input['bar_selected'] == 1:
+            extra_input['bar_n'] = int(self.bar_n_variable.get())
+        else:
+            # bar graph wasnt selected
+            extra_input['bar_n'] = 0
+        # Pie chart
+        extra_input['pie_selected'] = self.pie_select_variable.get()
+
         return extra_input
 
     def create_combobox(self, parent, width, font, justify, state, values):
