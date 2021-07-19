@@ -11,6 +11,8 @@ import pandastable as pdt
 
 SMALL_BUTTON_WIDTH = 3
 TEXT_WIDGET_WIDTH = 160
+TEXT_WIDGET_HEIGHT = 50
+
 class View(ttk.Frame):
     @abstractmethod
     def create_view():
@@ -503,6 +505,7 @@ class StatisticsOptionsView(View):
         self.option_add("*TCombobox*Listbox*Font", self.verytiny_font)
         self.pack(fill='both', expand=True, anchor = 'center')
         self.columnconfigure(0,weight = 1)
+        self.frame_height = self.parent.winfo_height()
 
         # List with the label of each statistics option
         self.options_label_list = []
@@ -582,7 +585,6 @@ class StatisticsOptionsView(View):
         a list of strings and images
         '''
         final_output = []
-
         # Header
         header_label = ttk.Label(self, text = 'Estatísticas:', style = "Subtitle.TLabel")
         header_label.grid(row = 3, column = 0, pady =  20)
@@ -605,8 +607,15 @@ class StatisticsOptionsView(View):
             label.grid(row = 0)
 
             # Result box
-            height = 3*len(model_output) + 20
-            text_box = tk.Text(frame, width = TEXT_WIDGET_WIDTH, height = height)
+
+            # Attempt to make a responsive text widget height
+            # fonte = font.Font(family='Helvetica', size=12)
+            # font_height = fonte.metrics('linespace')
+            # frame_height = SCREEN_HEIGHT
+            # height = frame_height/font_height
+            # print(f'font_height: {font_height}, frame_height: {frame_height}, height:{height}')
+
+            text_box = tk.Text(frame, width = TEXT_WIDGET_WIDTH, height = TEXT_WIDGET_HEIGHT)
             text_box.tag_config('left', justify = tk.LEFT, wrap = None)
             text_box.tag_config('center', justify = tk.CENTER, wrap = None)
             text_box.grid(row = 1)
@@ -617,8 +626,8 @@ class StatisticsOptionsView(View):
                     my_image = tk.PhotoImage(file = line)
                     text_box.image_create(tk.END, image = my_image)
                     # resize so the image can be seen
-                    height = height + 20
-                    text_box.config(height = height)
+                    #height = height + 10
+                    #text_box.config(height = height)
 
                     # download image button
                     text_box.insert(tk.END,'\n')
