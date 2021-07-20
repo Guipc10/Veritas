@@ -19,6 +19,7 @@ class ScrollFrame(tk.Frame):
 
         self.viewPort.bind("<Configure>", self.onFrameConfigure)                       #bind an event whenever the size of the viewPort frame changes.
         self.canvas.bind("<Configure>", self.onCanvasConfigure)                       #bind an event whenever the size of the viewPort frame changes.
+        # uncomment this to scroll even if cursos not on Scrollbar
         # self.canvas.bind("<Enter>", self._bound_to_mousewheel)
         # self.canvas.bind("<Leave>", self._unbound_to_mousewheel)
 

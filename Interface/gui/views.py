@@ -388,7 +388,7 @@ class QueryView(View):
         Creates a new scrollable tab on the notebook
 
         Inputs:
-        data: list of dictionaries contaning the data to be showed, it's the data after filtering
+        data: pandas dataFrame
         '''
 
         # Create frame inside the notebook
@@ -412,6 +412,7 @@ class QueryView(View):
 
     def generate_query_result_page(self, parent, index, data):
         # Close tab button
+        df = data
         close_button_frame = ttk.Frame(parent, width = 2)
         close_button_frame.pack(side='top',fill='both',expand=True)
         close_button = ttk.Button(close_button_frame, text = 'X', style = 'Close.TButton')
@@ -429,7 +430,6 @@ class QueryView(View):
         table_frame = ttk.Frame(main_frame, width = 1500, height = 500)
         table_frame.grid(row = 1, padx = 20)
         table_frame.grid_propagate(0)
-        df = pd.DataFrame.from_records(data)
         table = pdt.Table(table_frame, showtoolbar = False, showstatusbar = False, width = 500)
         table.model.df = df
         options = {'align': 'w',

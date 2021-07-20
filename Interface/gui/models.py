@@ -134,50 +134,72 @@ class LoadFilesModel():
                 flag = False
         return flag
 
-    def apply_filters(self, filters_dict, view_filters_list):
-        new_data = []
-        column_delete_set = set()
-        print('view filters list:', view_filters_list)
+    def apply_filters(self,filters_dict, view_filters_list):
+        df_list = []
         for file in self.data_list:
-            for dic in file:
-                # make a copy so it doesnt change the original data
-                tmp_dict = dic.copy()
-                add_permission = True
-                for key,value in tmp_dict.items():
-                    if key not in view_filters_list:
-                        # This column was not selected in the view filter
-                        column_delete_set.add(key)
-                        continue
-                    else:
-                        if key != 'processo':
-                        # processo is a useless key to filter but may cause overflow in the date check
-                            if not self.is_date(str(value)):
-                                # it's  not a date
-                                if key in filters_dict.keys():
-                                    # key may have been filtered
-                                    if not self.filter_is_empty(filters_dict[key]):
-                                        # filter for this key is not empty
-                                        if value not in filters_dict[key]:
-                                            add_permission = False
-                            else:
-                                # it's a date
-                                if key in filters_dict.keys():
-                                    if not self.filter_is_empty(filters_dict[key]):
-                                        initial_date = filters_dict[key][1]
-                                        if initial_date == '':
-                                            initial_date = '1700-01-01'
-                                        end_date = filters_dict[key][0]
-                                        if end_date == '':
-                                            end_date = '5000-01-01'
-                                        if (parse(value) < parse(initial_date)) or (parse(value) > parse(end_date)):
-                                            add_permission = False
-                # Delete the unwanted columns
-                for column in column_delete_set:
-                    del tmp_dict[column]
-                if add_permission:
-                    new_data.append(tmp_dict)
+            df = pd.DataFrame.from_records(file)
 
-        return new_data
+            # Apply visualization filter
+            for column in df.columns:
+                if column not in view_filters_list:
+                    df.drop(column, inplace=True, axis=1)
+                    if column.capitalize() in filters_dict.keys():
+                        del filters_dict[column.capitalize()]
+
+            # Apply selection filter
+            for key,values in filters_dict.items():
+                if not self.filter_is_empty(values):
+                    filter = (df[key.lower()].isin(values))
+                    df = df.loc[filter]
+
+            # THIS CONCAT MAY CAUSE ERRORS WHEN USING 2 DIFFERENT TYPES OF DOCUMENTS, LIKE FIRST AND SECOND DEGREE ONES
+            df_list.append(df)
+
+        return pd.concat(df_list, sort = False)
+
+    # def apply_filters(self, filters_dict, view_filters_list):
+    #     new_data = []
+    #     column_delete_set = set()
+    #     for file in self.data_list:
+    #         for dic in file:
+    #             # make a copy so it doesnt change the original data
+    #             tmp_dict = dic.copy()
+    #             add_permission = True
+    #             for key,value in tmp_dict.items():
+    #                 if key not in view_filters_list:
+    #                     # This column was not selected in the view filter
+    #                     column_delete_set.add(key)
+    #                     continue
+    #                 else:
+    #                     if key != 'processo':
+    #                     # processo is a useless key to filter but may cause overflow in the date check
+    #                         if not self.is_date(str(value)):
+    #                             # it's  not a date
+    #                             if key in filters_dict.keys():
+    #                                 # key may have been filtered
+    #                                 if not self.filter_is_empty(filters_dict[key]):
+    #                                     # filter for this key is not empty
+    #                                     if value not in filters_dict[key]:
+    #                                         add_permission = False
+    #                         else:
+    #                             # it's a date
+    #                             if key in filters_dict.keys():
+    #                                 if not self.filter_is_empty(filters_dict[key]):
+    #                                     initial_date = filters_dict[key][1]
+    #                                     if initial_date == '':
+    #                                         initial_date = '1700-01-01'
+    #                                     end_date = filters_dict[key][0]
+    #                                     if end_date == '':
+    #                                         end_date = '5000-01-01'
+    #                                     if (parse(value) < parse(initial_date)) or (parse(value) > parse(end_date)):
+    #                                         add_permission = False
+    #             # Delete the unwanted columns
+    #             for column in column_delete_set:
+    #                 del tmp_dict[column]
+    #             if add_permission:
+    #                 new_data.append(tmp_dict)
+    #
+    #     return new_data
 
     def save_csv(self, filters_dict, view_filters_list, index):
         data = self.apply_filters(filters_dict, view_filters_list)
@@ -238,7 +260,7 @@ class CountDocuments(ComponentModel):
         This module's required extra input is a list containing the categories on where the count in going to be made
         '''
         output = []
-        df = pd.DataFrame.from_records(data)
+        df = data
         total_documents = len(df)
         output.append('Número total de documentos: ' + str(total_documents))
         for column in extra_input['selected_categories']:
