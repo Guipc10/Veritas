@@ -49,23 +49,23 @@ class FilesController(Controller):
         # Buttons handlers
         self.tab_filters_list.append((filters_dict, view_filters_list))
         index = len(self.tab_filters_list) - 1
-        def csv_handler(event, self=self, i = index):
-            return self.export_to_csv(event, index = i)
+        def csv_handler(event, self=self, df = data):
+            return self.export_to_csv(event, df)
         csv_button.bind('<Button-1>',csv_handler)
-        def json_handler(event, self=self, i = index):
-            return self.export_to_json(event, index = i)
+        def json_handler(event, self=self, df = data):
+            return self.export_to_json(event, df)
         json_button.bind('<Button-1>',json_handler)
 
         # Create statistics options
-        self.statistics_controller.call_view(new_tab_frame, filters_dict, view_filters_list)
+        self.statistics_controller.call_view(new_tab_frame, data)
 
-    def export_to_csv(self, event, index):
-        (filters_dict, view_filters_list) = self.tab_filters_list[index]
-        self.model.save_csv(filters_dict,view_filters_list,index)
+    def export_to_csv(self, event, data):
+        #(filters_dict, view_filters_list) = self.tab_filters_list[index]
+        self.model.save_csv(data)
 
     def export_to_json(self, event, index):
-        (filters_dict, view_filters_list) = self.tab_filters_list[index]
-        self.model.save_json(filters_dict,view_filters_list,index)
+        #(filters_dict, view_filters_list) = self.tab_filters_list[index]
+        self.model.save_json(data)
 
 class StatisticsController(Controller):
     def __init__(self, model: LoadFilesModel, view: LoadFilesView):
@@ -85,14 +85,14 @@ class StatisticsController(Controller):
             self.statistics_options_view_list.append(view)
 
     # Creates a list of statistics option in the given parent frame
-    def call_view(self, parent, filters_dict, view_filters_list):
+    def call_view(self, parent, data):
         self.statistics_options_view_list.append(StatisticsOptionsView(parent, None))
         self.statistics_options_view_list[len(self.statistics_options_view_list)-1].create_view()
         models_descriptions = self.get_all_models_description()
-        self.statistics_options_view_list[len(self.statistics_options_view_list)-1].set_filters(filters_dict, view_filters_list)
-        self.statistics_options_view_list[len(self.statistics_options_view_list)-1].create_statistics_options(self.models_view_dict, models_descriptions, view_filters_list)
-        def handler(event, self=self, i=(len(self.statistics_options_view_list)-1)):
-            return self.generate_statistics(event,i)
+        #self.statistics_options_view_list[len(self.statistics_options_view_list)-1].set_filters(filters_dict, view_filters_list)
+        self.statistics_options_view_list[len(self.statistics_options_view_list)-1].create_statistics_options(self.models_view_dict, models_descriptions, data)
+        def handler(event, self=self, i=(len(self.statistics_options_view_list)-1), df = data):
+            return self.generate_statistics(event,i,df)
         self.statistics_options_view_list[len(self.statistics_options_view_list)-1].statistics_button.bind('<Button-1>', handler)
 
     def get_all_models_description(self):
@@ -101,17 +101,17 @@ class StatisticsController(Controller):
             all_descriptions[model_name] = model.get_description()
         return all_descriptions
 
-    def generate_statistics(self, event, options_view_index):
+    def generate_statistics(self, event, options_view_index, data):
         #get a list of names of the models that are going to be used
         selected_models = self.statistics_options_view_list[options_view_index].get_selected_models()
 
         # get the filters to be considered, it's in each statistics_options_view because it would take the "gerar consulta" filters
         # otherwise
-        filters_dict, view_filters_list = self.statistics_options_view_list[options_view_index].get_filters()
+        #filters_dict, view_filters_list = self.statistics_options_view_list[options_view_index].get_filters()
 
         #apply filters on the data to generate a filtered data, the data returned is a list of dicts,
         # where each dictionary is one document
-        filtered_data = self.load_files_model.apply_filters(filters_dict, view_filters_list)
+        #filtered_data = self.load_files_model.apply_filters(filters_dict, view_filters_list)
 
         # Output is dict, where the key is the name of the model and the items are its content:
         # a list of strings and images
@@ -121,7 +121,7 @@ class StatisticsController(Controller):
                 extra_input = self.models_view_dict[model_name].get_extra_input()
             else:
                 extra_input = None
-            output[model_name] = self.models_dict[model_name].execute(filtered_data, extra_input)
+            output[model_name] = self.models_dict[model_name].execute(data, extra_input)
 
         # Generates output on the screen
         self.statistics_options_view_list[options_view_index].generate_output(output)

@@ -536,7 +536,7 @@ class StatisticsOptionsView(View):
 
     # Create the query options based on the parameter models_view_dict, if no view frame is given then just the standard
     # checkbox with the model's name will be created
-    def create_statistics_options(self, models_view_dict, models_descriptions, view_filters_list):
+    def create_statistics_options(self, models_view_dict, models_descriptions, data):
         for i,(model_name, view_component) in enumerate(models_view_dict.items()):
             # Help button
             def handler(self=self,model_name = model_name, description = models_descriptions[model_name]):
@@ -559,7 +559,7 @@ class StatisticsOptionsView(View):
                 tmp_frame = ttk.Frame(self.statisticsOptionsFrame)
                 #place it next to the checkbox
                 tmp_frame.grid(row = i, column = 3, padx = 10)
-                view_component.create_view(tmp_frame, view_filters_list)
+                view_component.create_view(tmp_frame, data)
 
         #Create query button, the command is binded by the controller
         self.statistics_button = ttk.Button(self, text = 'Gerar estatísticas')
@@ -571,7 +571,6 @@ class StatisticsOptionsView(View):
     def get_selected_models(self):
         selected_models_name = []
         for i, variable in enumerate(self.checkboxes_variable_list):
-            print(f'i é {i}, variable é {variable}')
             if variable.get() == 1:
                 selected_models_name.append(self.options_label_list[i].cget('text'))
         return selected_models_name
@@ -618,7 +617,11 @@ class StatisticsOptionsView(View):
             text_box = tk.Text(frame, width = TEXT_WIDGET_WIDTH, height = TEXT_WIDGET_HEIGHT)
             text_box.tag_config('left', justify = tk.LEFT, wrap = None)
             text_box.tag_config('center', justify = tk.CENTER, wrap = None)
-            text_box.grid(row = 1)
+            text_box.grid(row = 1, column = 0)
+            # Add scrollbar
+            scrollbar = ttk.Scrollbar(frame, command = text_box.yview)
+            scrollbar.grid(row = 1, column = 1, sticky = 'nsew')
+            text_box.config(yscrollcommand = scrollbar.set)
             for line in model_output:
                 if line.endswith('.png') or line.endswith('.jpeg'):
                     # It's a image path
@@ -696,7 +699,7 @@ class CountDocumentsView(ComponentView):
         self.pie_select_variable = tk.IntVar()
         self.pie_n_variable = tk.StringVar()
 
-    def create_view(self,parent, view_filters_list):
+    def create_view(self,parent, data):
         self.parent = parent
 
         # Category selection frame
@@ -710,7 +713,7 @@ class CountDocumentsView(ComponentView):
         self.combobox_frame = ttk.Frame(self.category_selec_frame)
         self.combobox_frame.grid(row = 0, column = 1, padx = 10)
 
-        self.create_combobox(self.combobox_frame, width = 10, font = self.verytiny_font,justify = 'right', state = 'readonly', values = view_filters_list)
+        self.create_combobox(self.combobox_frame, width = 10, font = self.verytiny_font,justify = 'right', state = 'readonly', values = list(data.columns))
 
         # bar options
         self.his_frame = ttk.Frame(parent)

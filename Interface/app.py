@@ -65,11 +65,11 @@ if __name__ == '__main__':
     # Link the controllers
     files_controller.bind_statistics_controller(statistics_controller)
 
-    testModel = TestModel()
+    #testModel = TestModel()
     countDocuments = CountDocuments()
 
     # The View class is passed instantiated
-    app.add_module(controller = statistics_controller, view = None, model = testModel)
+    #app.add_module(controller = statistics_controller, view = None, model = testModel)
     app.add_module(controller = statistics_controller, view = CountDocumentsView(), model = countDocuments)
 
     app.add_module(controller = statistics_controller, view = StatisticsOptionsView)

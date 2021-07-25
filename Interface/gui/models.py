@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from dateutil.parser import parse
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 
 # All new modules have to inherit from this class
 TEXT_WIDGET_WIDTH = 160
@@ -76,41 +77,69 @@ class LoadFilesModel():
         try:
             self.json_files = [json_file for json_file in os.listdir(self.files_path.get()) if json_file.endswith('.json')]
         except FileNotFoundError:
-            Print("Arquivos não encontrados, o diretório indicado pode estar incorreto")
+            Print("Arquivos JSON não encontrados, o diretório indicado pode estar incorreto")
 
         #I'M APPENDING TWO DIFFERENT TYPES OF JSON FILES HERE, 1 AND 2 DEGREE CASES, MAY CAUSE ERRORS
+        df_list = []
         self.data_list.clear()
         for json_file in self.json_files:
             with open(self.files_path.get() +'/'+ json_file,'r') as j:
-                self.data_list.append(json.load(j))
+                df_list.append(pd.DataFrame.from_records(json.load(j)))
+        # THIS CONCAT MAY CAUSE ERRORS WHEN USING 2 DIFFERENT TYPES OF DOCUMENTS, LIKE FIRST AND SECOND DEGREE ONES
+        self.data = pd.concat(df_list, sort = False)
 
-        #Get available metadata and it's possible values by iterating over the dictionaries
-        self.key_to_possible_values_dic.clear()
-        for file in self.data_list:
-            for dic in file:
-                for key,value in dic.items():
-                    if key not in self.key_to_possible_values_dic.keys():
-                        self.key_to_possible_values_dic[key] = set()
-                    self.key_to_possible_values_dic[key].add(value)
+        self.all_keys = list(self.data.columns)
 
-        self.all_keys = list(self.key_to_possible_values_dic.keys()).copy()
-
+        #remove useless keys for filtering
         UNIQUE_KEYS = ['ementa', 'processo', 'cdacordao', 'julgado', 'pagina', 'duplicado', 'cd_doc']
-        #remove useless keys from the metadata
-        for useless_key in UNIQUE_KEYS:
-            if useless_key in self.key_to_possible_values_dic.keys():
-                del self.key_to_possible_values_dic[useless_key]
 
-        #sort it alphabetically
-        for key in self.key_to_possible_values_dic.keys():
-            for value in self.key_to_possible_values_dic[key]:
-                break
-            if isinstance(value,int):
-                self.key_to_possible_values_dic[key] = sorted(self.key_to_possible_values_dic[key])
-            elif isinstance(value,str):
-                self.key_to_possible_values_dic[key] = sorted(self.key_to_possible_values_dic[key],key= str.lower)
+        #Get available metadata and it's possible values by iterating over the columns
+        self.key_to_possible_values_dic.clear()
+        for column in self.data:
+            if column not in UNIQUE_KEYS:
+                self.key_to_possible_values_dic[column] = np.sort(list(self.data[column].unique()))
 
         return self.all_keys, self.key_to_possible_values_dic
+
+    # def m_process_json(self):
+    #     try:
+    #         self.json_files = [json_file for json_file in os.listdir(self.files_path.get()) if json_file.endswith('.json')]
+    #     except FileNotFoundError:
+    #         Print("Arquivos não encontrados, o diretório indicado pode estar incorreto")
+    #
+    #     #I'M APPENDING TWO DIFFERENT TYPES OF JSON FILES HERE, 1 AND 2 DEGREE CASES, MAY CAUSE ERRORS
+    #     self.data_list.clear()
+    #     for json_file in self.json_files:
+    #         with open(self.files_path.get() +'/'+ json_file,'r') as j:
+    #             self.data_list.append(json.load(j))
+    #
+    #     #Get available metadata and it's possible values by iterating over the dictionaries
+    #     self.key_to_possible_values_dic.clear()
+    #     for file in self.data_list:
+    #         for dic in file:
+    #             for key,value in dic.items():
+    #                 if key not in self.key_to_possible_values_dic.keys():
+    #                     self.key_to_possible_values_dic[key] = set()
+    #                 self.key_to_possible_values_dic[key].add(value)
+    #
+    #     self.all_keys = list(self.key_to_possible_values_dic.keys()).copy()
+    #
+    #     UNIQUE_KEYS = ['ementa', 'processo', 'cdacordao', 'julgado', 'pagina', 'duplicado', 'cd_doc']
+    #     #remove useless keys from the metadata
+    #     for useless_key in UNIQUE_KEYS:
+    #         if useless_key in self.key_to_possible_values_dic.keys():
+    #             del self.key_to_possible_values_dic[useless_key]
+    #
+    #     #sort it alphabetically
+    #     for key in self.key_to_possible_values_dic.keys():
+    #         for value in self.key_to_possible_values_dic[key]:
+    #             break
+    #         if isinstance(value,int):
+    #             self.key_to_possible_values_dic[key] = sorted(self.key_to_possible_values_dic[key])
+    #         elif isinstance(value,str):
+    #             self.key_to_possible_values_dic[key] = sorted(self.key_to_possible_values_dic[key],key= str.lower)
+    #
+    #     return self.all_keys, self.key_to_possible_values_dic
 
     def is_date(self,string, fuzzy=False):
         """
@@ -135,27 +164,22 @@ class LoadFilesModel():
         return flag
 
     def apply_filters(self,filters_dict, view_filters_list):
-        df_list = []
-        for file in self.data_list:
-            df = pd.DataFrame.from_records(file)
+        df = self.data.copy()
 
-            # Apply visualization filter
-            for column in df.columns:
-                if column not in view_filters_list:
-                    df.drop(column, inplace=True, axis=1)
-                    if column.capitalize() in filters_dict.keys():
-                        del filters_dict[column.capitalize()]
+        # Apply visualization filter
+        for column in df.columns:
+            if column not in view_filters_list:
+                df.drop(column, inplace=True, axis=1)
+                if column.capitalize() in filters_dict.keys():
+                    del filters_dict[column.capitalize()]
 
-            # Apply selection filter
-            for key,values in filters_dict.items():
-                if not self.filter_is_empty(values):
-                    filter = (df[key.lower()].isin(values))
-                    df = df.loc[filter]
+        # Apply selection filter
+        for key,values in filters_dict.items():
+            if not self.filter_is_empty(values):
+                filter = (df[key.lower()].isin(values))
+                df = df.loc[filter]
 
-            # THIS CONCAT MAY CAUSE ERRORS WHEN USING 2 DIFFERENT TYPES OF DOCUMENTS, LIKE FIRST AND SECOND DEGREE ONES
-            df_list.append(df)
-
-        return pd.concat(df_list, sort = False)
+        return df
 
     # def apply_filters(self, filters_dict, view_filters_list):
     #     new_data = []
@@ -201,15 +225,13 @@ class LoadFilesModel():
     #
     #     return new_data
 
-    def save_csv(self, filters_dict, view_filters_list, index):
-        data = self.apply_filters(filters_dict, view_filters_list)
+    def save_csv(self, data):
         df = pd.DataFrame.from_records(data)
         save_directory = tk.filedialog.askdirectory(mustexist = True, title = 'Selecione o diretório em que deseja salvar o arquivo CSV')
         if not save_directory == '':
             df.to_csv(save_directory + '/veritas_consulta' + str(index) + '.csv', encoding='utf-8')
 
-    def save_json(self, filters_dict, view_filters_list, index):
-        data = self.apply_filters(filters_dict, view_filters_list)
+    def save_json(self, data):
         df = pd.DataFrame.from_records(data)
         save_directory = tk.filedialog.askdirectory(mustexist = True, title = 'Selecione o diretório em que deseja salvar o arquivo JSON')
         if not save_directory == '':
@@ -239,8 +261,7 @@ class TestModel(ComponentModel):
 
 class CountDocuments(ComponentModel):
     def __init__(self):
-        print('Starting Count Documents model')
-
+        return
     def get_name(self):
         return 'Count Documents'
 
