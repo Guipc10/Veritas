@@ -284,6 +284,7 @@ class CountDocuments(ComponentModel):
         df = data
         total_documents = len(df)
         output.append('Número total de documentos: ' + str(total_documents))
+        
         for column in extra_input['selected_categories']:
             if column in df.columns:
                 output.append('\nNúmero de documentos por: ' + str(column))
@@ -301,7 +302,7 @@ class CountDocuments(ComponentModel):
                     bar_fig, bar_ax = plt.subplots()
                     bar_fig.set_size_inches((12,6))
                     plt.rcParams['font.size'] = 12.0
-                    bar_df['Absoluto'].head(extra_input['bar_n']).plot(kind='bar', ax=bar_ax)
+                    bar_df['Absoluto'].sort_index().head(extra_input['bar_n']).plot(kind='bar', ax=bar_ax)
                     bar_ax.set_xlabel(column.capitalize())
                     bar_ax.set_ylabel('N° de documentos')
                     bar_ax.set_title(str(column.capitalize()+ 's mais frequentes'))
@@ -326,3 +327,15 @@ class CountDocuments(ComponentModel):
             output.append('-'*TEXT_WIDGET_WIDTH)
 
         return output
+
+# class DateGraph(ComponentModel):
+#     def get_name():
+#         return 'Date Graph'
+#
+#     def requires_extra_input():
+#         return False
+#
+#     def get_description():
+#         return 'Gera um gráfico do número de documentos por período de tempo'
+#
+#     def execute(data, extra_input = None):

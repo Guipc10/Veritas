@@ -70,7 +70,7 @@ if __name__ == '__main__':
 
     # The View class is passed instantiated
     #app.add_module(controller = statistics_controller, view = None, model = testModel)
-    app.add_module(controller = statistics_controller, view = CountDocumentsView(), model = countDocuments)
+    app.add_module(controller = statistics_controller, view = CountDocumentsView, model = countDocuments)
 
     app.add_module(controller = statistics_controller, view = StatisticsOptionsView)
 

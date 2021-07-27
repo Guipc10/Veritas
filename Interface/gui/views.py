@@ -19,7 +19,7 @@ class View(ttk.Frame):
         raise NotImplementedError
 
 class ComponentView():
-    def __init__(self):
+    def __init__(self, parent):
         '''
         Standardize style and background
         '''
@@ -34,7 +34,7 @@ class ComponentView():
         self.style.configure('Std.TCheckbutton', background=self.background)
 
     @abstractmethod
-    def create_view(parent, view_filters_list):
+    def create_view():
         '''
         This method creates the component view to get the needed inputs
 
@@ -537,7 +537,8 @@ class StatisticsOptionsView(View):
     # Create the query options based on the parameter models_view_dict, if no view frame is given then just the standard
     # checkbox with the model's name will be created
     def create_statistics_options(self, models_view_dict, models_descriptions, data):
-        for i,(model_name, view_component) in enumerate(models_view_dict.items()):
+        models_view_dict_tmp = models_view_dict.copy()
+        for i,(model_name, view_component) in enumerate(models_view_dict_tmp.items()):
             # Help button
             def handler(self=self,model_name = model_name, description = models_descriptions[model_name]):
                 return self.show_help_window(description,model_name)
@@ -559,12 +560,14 @@ class StatisticsOptionsView(View):
                 tmp_frame = ttk.Frame(self.statisticsOptionsFrame)
                 #place it next to the checkbox
                 tmp_frame.grid(row = i, column = 3, padx = 10)
-                view_component.create_view(tmp_frame, data)
+                models_view_dict_tmp[model_name] = view_component(tmp_frame)
+                models_view_dict_tmp[model_name].create_view(data)
 
         #Create query button, the command is binded by the controller
         self.statistics_button = ttk.Button(self, text = 'Gerar estatísticas')
         self.statistics_button.grid(row = 2, column = 0, pady = 20)
 
+        return models_view_dict_tmp
     def show_help_window(self, model_description, model_name):
         tk.messagebox.showinfo(model_name, model_description)
 
@@ -690,20 +693,19 @@ class StatisticsOptionsView(View):
         pdf.output(save_directory+'/veritas_'+model_name+'.pdf')
 
 class CountDocumentsView(ComponentView):
-    def __init__(self):
-        super().__init__()
-        self.parent = None
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
         self.selection_list = []
         self.bar_select_variable = tk.IntVar()
         self.bar_n_variable = tk.StringVar()
         self.pie_select_variable = tk.IntVar()
         self.pie_n_variable = tk.StringVar()
 
-    def create_view(self,parent, data):
-        self.parent = parent
+    def create_view(self, data):
 
         # Category selection frame
-        self.category_selec_frame = ttk.Frame(parent)
+        self.category_selec_frame = ttk.Frame(self.parent)
         self.category_selec_frame.grid(row = 0, column = 0, sticky = tk.W)
 
         self.label = ttk.Label(self.category_selec_frame, text = 'Contar por:', style = 'Std.TLabel')
@@ -712,17 +714,18 @@ class CountDocumentsView(ComponentView):
         # frame for the comboboxes
         self.combobox_frame = ttk.Frame(self.category_selec_frame)
         self.combobox_frame.grid(row = 0, column = 1, padx = 10)
-
+        self.selection_list = []
         self.create_combobox(self.combobox_frame, width = 10, font = self.verytiny_font,justify = 'right', state = 'readonly', values = list(data.columns))
 
         # bar options
-        self.his_frame = ttk.Frame(parent)
+        self.his_frame = ttk.Frame(self.parent)
         self.his_frame.grid(row = 1, column = 0, pady = 5, sticky = tk.W)
 
         self.his_label = ttk.Label(self.his_frame, text = 'Gerar gráfico de barras', style = 'Std.TLabel')
         self.his_label.grid(row = 0, column = 0)
 
         self.bar_checkbox = ttk.Checkbutton(self.his_frame, variable = self.bar_select_variable, command = self.show_hide_bar_options)
+        self.bar_select_variable.set(0)
         self.bar_checkbox.grid(row = 0, column = 1, padx = 10, sticky = tk.E)
 
         self.bar_options_frame = ttk.Frame(self.his_frame)
@@ -739,13 +742,14 @@ class CountDocumentsView(ComponentView):
         self.bar_options_frame.grid_remove()
 
         # pie chart options
-        self.pie_frame = ttk.Frame(parent)
+        self.pie_frame = ttk.Frame(self.parent)
         self.pie_frame.grid(row = 2, column = 0, pady = 5, sticky = tk.W)
 
         self.pie_label = ttk.Label(self.pie_frame, text = 'Gerar gráfico de pizza', style = 'Std.TLabel')
         self.pie_label.grid(row = 0, column = 0)
 
         self.pie_checkbox = ttk.Checkbutton(self.pie_frame, variable = self.pie_select_variable)
+        self.pie_select_variable.set(0)
         self.pie_checkbox.grid(row = 0, column = 1, padx = 10, sticky = tk.E)
 
     def show_hide_bar_options(self):

@@ -74,6 +74,8 @@ class StatisticsController(Controller):
         self.statistics_options_view_list = []
         self.models_dict = {}
         self.models_view_dict = {}
+        # List of dictionaries so each tab has it own instance of the model's view
+        self.models_view_dict_list = []
 
     def bind(self,view: View, **kwargs):
 
@@ -90,7 +92,8 @@ class StatisticsController(Controller):
         self.statistics_options_view_list[len(self.statistics_options_view_list)-1].create_view()
         models_descriptions = self.get_all_models_description()
         #self.statistics_options_view_list[len(self.statistics_options_view_list)-1].set_filters(filters_dict, view_filters_list)
-        self.statistics_options_view_list[len(self.statistics_options_view_list)-1].create_statistics_options(self.models_view_dict, models_descriptions, data)
+        # append new instances of models views
+        self.models_view_dict_list.append(self.statistics_options_view_list[len(self.statistics_options_view_list)-1].create_statistics_options(self.models_view_dict, models_descriptions, data))
         def handler(event, self=self, i=(len(self.statistics_options_view_list)-1), df = data):
             return self.generate_statistics(event,i,df)
         self.statistics_options_view_list[len(self.statistics_options_view_list)-1].statistics_button.bind('<Button-1>', handler)
@@ -118,7 +121,7 @@ class StatisticsController(Controller):
         output = {}
         for model_name in selected_models:
             if self.models_dict[model_name].requires_extra_input():
-                extra_input = self.models_view_dict[model_name].get_extra_input()
+                extra_input = self.models_view_dict_list[options_view_index-1][model_name].get_extra_input()
             else:
                 extra_input = None
             output[model_name] = self.models_dict[model_name].execute(data, extra_input)
