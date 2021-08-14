@@ -6,6 +6,7 @@ from dateutil.parser import parse
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import re
 
 # All new modules have to inherit from this class
 TEXT_WIDGET_WIDTH = 160
@@ -88,6 +89,9 @@ class LoadFilesModel():
         # THIS CONCAT MAY CAUSE ERRORS WHEN USING 2 DIFFERENT TYPES OF DOCUMENTS, LIKE FIRST AND SECOND DEGREE ONES
         self.data = pd.concat(df_list, sort = False)
 
+        # add an author and target column
+        self.extract_people()
+
         self.all_keys = list(self.data.columns)
 
         #remove useless keys for filtering
@@ -100,6 +104,79 @@ class LoadFilesModel():
                 self.key_to_possible_values_dic[column] = np.sort(list(self.data[column].unique()))
 
         return self.all_keys, self.key_to_possible_values_dic
+
+    def extract_people(self):
+        #author_pattern = re.compile(r'\n')
+        #author_pattern = re.compile('(.+?)(?=\n)')
+        authors = []
+        defendants = []
+        general_pattern = re.compile(r'(Autor|Autora|Autor e Parte|Requerente|Requerente (s)|Impetrante|Exequente|Exeqüente|Embargante|Demandante|MAGISTRADO|Herdeiro|Inventariante|Inventariante (Ativo)|Inventariante (Ativo)):\s(.+?)(?=(Justiça Gratuita|Juiz|Juíza|Prioridade Idoso|Conclusão|CONCLUSÃO|C O N C L U S Ã O|Réu Preso|Descrição|Vistos|VISTOS|Controle))')
+        i = 0
+        print_index = 283
+        print(str(self.data['julgado'].head(2)))
+        for text in self.data['julgado']:
+            author = np.nan
+            defendant = np.nan
+            if i == print_index:
+                print(text)
+            sentence = general_pattern.search(text)
+            if sentence:
+                #print('Sentença: ',sentence.group())
+                # First get the phrase without the first colon
+                remove_first_colon_pattern = re.compile(r'(?<=:\s).*')
+                no_first_colon_search = remove_first_colon_pattern.search(sentence.group())
+                if i == print_index:
+                    print(f'\n\nsentence: ', sentence.group())
+                if no_first_colon_search:
+                    # Now get the author, which is the text before the word that is before the remaining colon
+                    #author_pattern = re.compile(r'(?<=:\s).*(?=\s(\S+):)')
+                    if i == print_index:
+                        print(f'\n\nno_first_colon_search: ', no_first_colon_search.group())
+                    author_pattern = re.compile(r'.*(?=\s(\S*):)')
+                    author_search = author_pattern.search(no_first_colon_search.group())
+                    if author_search:
+                        author = author_search.group()
+
+                    # Get the defendant, which is the text after the remaining colon
+                    defendant_pattern = re.compile(r'(?<=:\s).*')
+                    defendant_search = defendant_pattern.search(no_first_colon_search.group())
+                    if defendant_search:
+                        defendant = defendant_search.group()
+                    else:
+                        # cant find a second colon, so the match is only for the author
+                        author = no_first_colon_search.group()
+            else:
+                # check if there is only information about the defendant
+                pattern = re.compile(r'(Réu):\s(.+?)(?=(Justiça Gratuita|Juiz|Juíza|Prioridade Idoso|Conclusão|CONCLUSÃO|C O N C L U S Ã O|Réu Preso|Descrição|Vistos))')
+                sentence = pattern.search(text)
+                if sentence:
+                    remove_first_colon_pattern = re.compile(r'(?<=:\s).*')
+                    no_first_colon_search = remove_first_colon_pattern.search(sentence.group())
+                    if no_first_colon_search:
+                        defendant = no_first_colon_search.group()
+            authors.append(author)
+            defendants.append(defendant)
+            if author == np.nan or author == "":
+                print('\nVazio---------------------\n')
+                if author == '':
+                    print('autor é string vazia\n')
+                print('\ntext:\n')
+                print(text)
+                if sentence:
+                    print('\nsentence:\n')
+                    print(sentence.group())
+                if no_first_colon_search:
+                    print('\nno_first_colon_search\n:')
+                    print(no_first_colon_search.group())
+
+            i = i+1
+        self.data['autor'] = authors
+        self.data['réu'] = defendants
+        null_authors = self.data['autor'].isnull().sum()
+        null_defendants = self.data['réu'].isnull().sum()
+        rows = len(self.data)
+        print(f'autores faltantes: {(null_authors/rows)*100}%\n\nréus faltantes:{(null_defendants/rows)*100}%')
+        #print(self.data.head(10))
 
     # def m_process_json(self):
     #     try:
@@ -284,7 +361,7 @@ class CountDocuments(ComponentModel):
         df = data
         total_documents = len(df)
         output.append('Número total de documentos: ' + str(total_documents))
-        
+
         for column in extra_input['selected_categories']:
             if column in df.columns:
                 output.append('\nNúmero de documentos por: ' + str(column))
