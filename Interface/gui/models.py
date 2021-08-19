@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import re
+import unidecode
+from icecream import ic
 
 # All new modules have to inherit from this class
 TEXT_WIDGET_WIDTH = 160
@@ -49,7 +51,7 @@ class ComponentModel():
         Inputs:
         - Input data (Type: List of dictionaries)
         Outputs:
-        - Model's output list(Type: string or path to png or jpeg image)
+        - Model's output list(Type: string, path to png or jpeg image or a pandas DataFrame)
         '''
         raise NotImplementedError
 
@@ -89,9 +91,6 @@ class LoadFilesModel():
         # THIS CONCAT MAY CAUSE ERRORS WHEN USING 2 DIFFERENT TYPES OF DOCUMENTS, LIKE FIRST AND SECOND DEGREE ONES
         self.data = pd.concat(df_list, sort = False)
 
-        # add an author and target column
-        self.extract_people()
-
         self.all_keys = list(self.data.columns)
 
         #remove useless keys for filtering
@@ -104,79 +103,6 @@ class LoadFilesModel():
                 self.key_to_possible_values_dic[column] = np.sort(list(self.data[column].unique()))
 
         return self.all_keys, self.key_to_possible_values_dic
-
-    def extract_people(self):
-        #author_pattern = re.compile(r'\n')
-        #author_pattern = re.compile('(.+?)(?=\n)')
-        authors = []
-        defendants = []
-        general_pattern = re.compile(r'(Autor|Autora|Autor e Parte|Requerente|Requerente (s)|Impetrante|Exequente|Exeqüente|Embargante|Demandante|MAGISTRADO|Herdeiro|Inventariante|Inventariante (Ativo)|Inventariante (Ativo)):\s(.+?)(?=(Justiça Gratuita|Juiz|Juíza|Prioridade Idoso|Conclusão|CONCLUSÃO|C O N C L U S Ã O|Réu Preso|Descrição|Vistos|VISTOS|Controle))')
-        i = 0
-        print_index = 283
-        print(str(self.data['julgado'].head(2)))
-        for text in self.data['julgado']:
-            author = np.nan
-            defendant = np.nan
-            if i == print_index:
-                print(text)
-            sentence = general_pattern.search(text)
-            if sentence:
-                #print('Sentença: ',sentence.group())
-                # First get the phrase without the first colon
-                remove_first_colon_pattern = re.compile(r'(?<=:\s).*')
-                no_first_colon_search = remove_first_colon_pattern.search(sentence.group())
-                if i == print_index:
-                    print(f'\n\nsentence: ', sentence.group())
-                if no_first_colon_search:
-                    # Now get the author, which is the text before the word that is before the remaining colon
-                    #author_pattern = re.compile(r'(?<=:\s).*(?=\s(\S+):)')
-                    if i == print_index:
-                        print(f'\n\nno_first_colon_search: ', no_first_colon_search.group())
-                    author_pattern = re.compile(r'.*(?=\s(\S*):)')
-                    author_search = author_pattern.search(no_first_colon_search.group())
-                    if author_search:
-                        author = author_search.group()
-
-                    # Get the defendant, which is the text after the remaining colon
-                    defendant_pattern = re.compile(r'(?<=:\s).*')
-                    defendant_search = defendant_pattern.search(no_first_colon_search.group())
-                    if defendant_search:
-                        defendant = defendant_search.group()
-                    else:
-                        # cant find a second colon, so the match is only for the author
-                        author = no_first_colon_search.group()
-            else:
-                # check if there is only information about the defendant
-                pattern = re.compile(r'(Réu):\s(.+?)(?=(Justiça Gratuita|Juiz|Juíza|Prioridade Idoso|Conclusão|CONCLUSÃO|C O N C L U S Ã O|Réu Preso|Descrição|Vistos))')
-                sentence = pattern.search(text)
-                if sentence:
-                    remove_first_colon_pattern = re.compile(r'(?<=:\s).*')
-                    no_first_colon_search = remove_first_colon_pattern.search(sentence.group())
-                    if no_first_colon_search:
-                        defendant = no_first_colon_search.group()
-            authors.append(author)
-            defendants.append(defendant)
-            if author == np.nan or author == "":
-                print('\nVazio---------------------\n')
-                if author == '':
-                    print('autor é string vazia\n')
-                print('\ntext:\n')
-                print(text)
-                if sentence:
-                    print('\nsentence:\n')
-                    print(sentence.group())
-                if no_first_colon_search:
-                    print('\nno_first_colon_search\n:')
-                    print(no_first_colon_search.group())
-
-            i = i+1
-        self.data['autor'] = authors
-        self.data['réu'] = defendants
-        null_authors = self.data['autor'].isnull().sum()
-        null_defendants = self.data['réu'].isnull().sum()
-        rows = len(self.data)
-        print(f'autores faltantes: {(null_authors/rows)*100}%\n\nréus faltantes:{(null_defendants/rows)*100}%')
-        #print(self.data.head(10))
 
     # def m_process_json(self):
     #     try:
@@ -402,6 +328,180 @@ class CountDocuments(ComponentModel):
                     pie_fig.savefig(cwd+'/images/'+column+'_pie'+'.png')
                     output.append(cwd+'/images/'+column+'_pie'+'.png')
             output.append('-'*TEXT_WIDGET_WIDTH)
+
+        return output
+
+class MatchNames(ComponentModel):
+    def get_name(self):
+        return 'Match Names'
+
+    def requires_extra_input(self):
+        return False
+
+    def get_description(self):
+        return 'Encontra pessoas que estão envolvidas em mais de um processo'
+
+    def isNaN(self, string):
+        return string != string
+
+    def extract_people(self, data):
+        #author_pattern = re.compile(r'\n')
+        #author_pattern = re.compile('(.+?)(?=\n)')
+        authors = []
+        defendants = []
+        general_pattern = re.compile(r'(Autor|Autora|Autor e Parte|Requerente|Requerente (s)|Impetrante|Exequente|Exeqüente|Embargante|Demandante|MAGISTRADO|Herdeiro|Inventariante|Inventariante (Ativo)|Inventariante (Ativo)):\s(.+?)(?=(Justiça Gratuita|Juiz|Juíza|Prioridade Idoso|Artigo da|Conclusão|CONCLUSÃO|C O N C L U S Ã O|Réu Preso|Descrição|Data da identificação|Vistos|VISTOS|Controle))')
+        i = 0
+        print_index = 99999
+        for text in data['julgado']:
+            author = np.NaN
+            defendant = np.NaN
+            if i == print_index:
+                print(text)
+            sentence = general_pattern.search(text)
+            if sentence:
+                #print('Sentença: ',sentence.group())
+                # First get the phrase without the first colon
+                remove_first_colon_pattern = re.compile(r'(?<=:\s).*')
+                no_first_colon_search = remove_first_colon_pattern.search(sentence.group())
+                if i == print_index:
+                    print(f'\n\nsentence: ', sentence.group())
+                if no_first_colon_search:
+                    # Now get the author, which is the text before the word that is before the remaining colon
+                    #author_pattern = re.compile(r'(?<=:\s).*(?=\s(\S+):)')
+                    if i == print_index:
+                        print(f'\n\nno_first_colon_search: ', no_first_colon_search.group())
+                    author_pattern = re.compile(r'.*(?=\s(\S*):)')
+                    author_search = author_pattern.search(no_first_colon_search.group())
+                    if author_search:
+                        # remove the case where the defendant part is written using "autor do fato"
+                        remove_autor_do_pattern = re.compile(r'.*(?=\sAutor do)')
+                        remove_search = remove_autor_do_pattern.search(author_search.group())
+                        if remove_search:
+                            author = remove_search.group()
+                        else:
+                            author = author_search.group()
+
+                    # Get the defendant, which is the text after the remaining colon
+                    defendant_pattern = re.compile(r'(?<=:\s).*')
+                    defendant_search = defendant_pattern.search(no_first_colon_search.group())
+                    if defendant_search:
+                        defendant = defendant_search.group()
+                    else:
+                        # cant find a second colon, so the match is only for the author
+                        author = no_first_colon_search.group()
+            else:
+                # check if there is only information about the defendant
+                pattern = re.compile(r'(Réu):\s(.+?)(?=(Justiça Gratuita|Juiz|Juíza|Prioridade Idoso|Conclusão|CONCLUSÃO|C O N C L U S Ã O|Réu Preso|Descrição|Vistos))')
+                sentence = pattern.search(text)
+                if sentence:
+                    remove_first_colon_pattern = re.compile(r'(?<=:\s).*')
+                    no_first_colon_search = remove_first_colon_pattern.search(sentence.group())
+                    if no_first_colon_search:
+                        defendant = no_first_colon_search.group()
+
+            # Remove authors and defendants that are too long and therefore are probably wrong
+            if len(str(author)) > 100:
+                author = np.nan
+            if len(str(defendant)) > 100:
+                defendant = np.nan
+            # Remove extra whitespaces and pontuation
+            if not self.isNaN(author):
+                author = str(author).strip()
+                #author = str(unidecode.unidecode(author))
+            if not self.isNaN(defendant):
+                defendant = str(defendant).strip()
+                #defendant = str(unidecode.unidecode(defendant))
+            authors.append(author)
+            defendants.append(defendant)
+            i = i+1
+        data['autor'] = authors
+        data['réu'] = defendants
+        null_authors = data['autor'].isnull().sum()
+        null_defendants = data['réu'].isnull().sum()
+        rows = len(data)
+        print(f'autores faltantes: {(null_authors/rows)*100}%\n\nréus faltantes:{(null_defendants/rows)*100}%')
+        return data
+
+    def search_single_person(self,data):
+        author_city_grouped_count = data.groupby(['comarca','autor'], as_index = True).size()
+        author_city_grouped = data.groupby(['comarca','autor'], as_index = False)
+        defendant_city_grouped_count = data.groupby(['comarca','réu'], as_index = True).size()
+        defendant_city_grouped = data.groupby(['comarca','réu'], as_index = False)
+        all_count = author_city_grouped_count.combine(defendant_city_grouped_count,lambda x,y:x+y, fill_value = 0)
+        # author_count  = data['autor'].value_counts()
+        # defendant_count = data['réu'].value_counts()
+        # all_count = author_count.combine(defendant_count,lambda x,y:x+y, fill_value = 0)
+        count_df = pd.DataFrame({'Número de aparições': all_count})
+        not_unique = count_df.loc[count_df['Número de aparições'] > 1]
+        total_length = len(count_df)
+        not_unique_length = len(not_unique)
+        print(f'Pessoas que estão em mais de 1 documento: {(not_unique_length/total_length)*100}%')
+
+        # Recover de process code from the selected processes
+        author_merge = not_unique.merge(data, left_index=True, right_on = ['comarca','autor'])
+        author_merge.drop('réu',axis=1, inplace=True)
+        author_merge.rename(columns={'autor': 'nome'}, inplace=True)
+        author_merge['autor ou réu'] = 'autor'
+        defendant_merge = not_unique.merge(data, left_index=True, right_on = ['comarca','réu'])
+        defendant_merge.drop('autor',axis=1, inplace=True)
+        defendant_merge.rename(columns={'réu': 'nome'}, inplace=True)
+        defendant_merge['autor ou réu'] = 'réu'
+        author_defendant_merge = pd.concat([author_merge,defendant_merge], sort = False)
+        author_defendant_merge = author_defendant_merge.sort_values('nome').reset_index()
+
+        # Drop null values
+        author_defendant_merge = author_defendant_merge.replace(['nan',''],np.nan)
+        author_defendant_merge = author_defendant_merge.dropna()
+
+        return [author_defendant_merge]
+
+    def search_pairs(self,data):
+        # Copy so it doesnt cause inconsistency
+        new_data = data.copy()
+
+        # Sort so the order doesnt matter
+        new_data[['autor','réu']] = np.sort(new_data[['autor','réu']].astype('str'), axis = 1)
+
+        data_grouped_count = new_data.groupby(['autor','réu']).size()
+        data_count = pd.DataFrame({'Número de Aparições': data_grouped_count})
+        not_unique = data_count.loc[data_count['Número de Aparições'] > 1]
+        n_pairs = len(data_count)
+        not_unique_pairs = len(not_unique)
+
+        # Merge to recover process code
+        merged_pairs = not_unique.merge(new_data, left_index = True, right_on = ['autor','réu'])
+
+        # Drop null values
+        merged_pairs = merged_pairs.replace(['nan',''],np.nan)
+        merged_pairs = merged_pairs.dropna()
+
+        # Assign a number to each group
+        merged_pairs['grupo'] = merged_pairs.groupby(['autor','réu']).ngroup()
+        merged_pairs.set_index('grupo', inplace = True)
+        merged_pairs.rename(columns = {'Número de Aparições': 'tamanho_grupo', 'autor': 'parte1', 'réu': 'parte2'}, inplace=True)
+        merged_pairs.drop(columns=['pagina'],inplace = True)
+
+        # Rearrange column order
+        columns = list(merged_pairs.columns)
+        columns.remove('parte1')
+        columns.remove('parte2')
+        ic(columns)
+        merged_pairs = merged_pairs[['parte1','parte2']+columns]
+
+        print(f'Pares que estão em mais de 1 documento: {(not_unique_pairs/n_pairs)*100}%')
+        return [merged_pairs]
+
+    def execute(self,data, extra_input = None):
+        output = []
+
+        # Extract author and defendant from the text, add it as two new columns
+        self.extract_people(data)
+
+        # Find the people that are part of more than one document
+        #output += self.search_single_person(data)
+
+        # Find the pair of people that appear together in more than one document
+        output += self.search_pairs(data)
 
         return output
 

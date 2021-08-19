@@ -584,7 +584,7 @@ class StatisticsOptionsView(View):
 
         Inputs:
         output_dict: A dictionary, where the key is the name of the model and the items are its content:
-        a list of strings and images
+        a list of strings, images or a pandas DataFrame
         '''
         final_output = []
         # Header
@@ -601,6 +601,10 @@ class StatisticsOptionsView(View):
 
         # Generates a frame and a text widget for each model result
         for i,(model_name, model_output) in enumerate(output_dict.items()):
+            # At first the model wont have the option to export the content to csv
+            export_to_csv = False
+            df_list = []
+
             frame = ttk.Frame(self.statisticsResultsFrame)
             frame.grid(row = i, pady = 20)
 
@@ -626,37 +630,70 @@ class StatisticsOptionsView(View):
             scrollbar.grid(row = 1, column = 1, sticky = 'nsew')
             text_box.config(yscrollcommand = scrollbar.set)
             for line in model_output:
-                if line.endswith('.png') or line.endswith('.jpeg'):
-                    # It's a image path
-                    global my_image
-                    my_image = tk.PhotoImage(file = line)
-                    text_box.image_create(tk.END, image = my_image)
-                    # resize so the image can be seen
-                    #height = height + 10
-                    #text_box.config(height = height)
-
-                    # download image button
-                    text_box.insert(tk.END,'\n')
-                    def download_handler(self=self, image = my_image, image_path = line):
-                        return self.download_image(image,image_path)
-                    text_box.window_create(tk.END, window = ttk.Button(text_box, text = 'Baixar imagem',command = download_handler))
-                    # Centralize button and image
-                    text_box.tag_add('center','end-1l linestart','end')
-                elif isinstance(line,str):
+                if isinstance(line, pd.DataFrame):
+                    export_to_csv = True
+                    df_list.append(line)
+                    # Also convert it to string and insert it's first 5 columms as a text
+                    all_columns = line.columns
+                    all_columns_str = str(list(all_columns))
+                    text_box.insert(tk.END,f'Há um total de {len(all_columns)} colunas:\n\n','left')
+                    text_box.insert(tk.END,all_columns_str,'left')
+                    text_box.insert(tk.END,f'\n\nMas só as 5 primeiras são mostradas abaixo, exporte para CSV para obter todas:\n\n','left')
+                    # MAYBE THE LINE VARIABLE WONT BE MODIFIED AND WILL OCCUR AN ERROR WHEN GENERATING THE PDF
+                    line = line.T.head(5).T.to_string(justify='center',max_colwidth = 30)
                     text_box.insert(tk.END,line,'left')
+                elif isinstance(line,str):
+                    if line.endswith('.png') or line.endswith('.jpeg'):
+                        # It's a image path
+                        global my_image
+                        my_image = tk.PhotoImage(file = line)
+                        text_box.image_create(tk.END, image = my_image)
+                        # resize so the image can be seen
+                        #height = height + 10
+                        #text_box.config(height = height)
+
+                        # download image button
+                        text_box.insert(tk.END,'\n')
+                        def download_handler(self=self, image = my_image, image_path = line):
+                            return self.download_image(image,image_path)
+                        text_box.window_create(tk.END, window = ttk.Button(text_box, text = 'Baixar imagem',command = download_handler))
+                        # Centralize button and image
+                        text_box.tag_add('center','end-1l linestart','end')
+                    else:
+                        # It's just text
+                        text_box.insert(tk.END,line,'left')
                 else:
-                    raise TypeError('Models output list must contain only strings (Text) or path to png/jpeg image')
+                    raise TypeError('Models output list must contain only strings (Text), path to png/jpeg image or pandas DataFrames')
                 text_box.insert(tk.END,'\n','left')
 
             # Read only
             text_box.config(state=tk.DISABLED)
 
             # Export to PDF button
-            export_button = ttk.Button(frame, text = 'Exportar para PDF')
-            export_button.grid(row = 2, column = 0, pady = 10)
+            # Create for the button(s)
+            buttons_frame = ttk.Frame(frame)
+            buttons_frame.grid(row = 2, column = 0, pady = 10)
+            export_pdf_button = ttk.Button(buttons_frame, text = 'Exportar para PDF')
+            export_pdf_button.grid(row = 0, column = 0)
             def handler(event, self=self, output = (model_name, model_output)):
                 return self.generate_pdf(event,output)
-            export_button.bind("<Button-1>", handler)
+            export_pdf_button.bind("<Button-1>", handler)
+
+            # Export to CSV button
+            if export_to_csv:
+                export_csv_button = ttk.Button(buttons_frame, text = 'Exportar DataFrame(s) para CSV(s)')
+                export_csv_button.grid(row = 0, column = 1, padx = 10)
+                def handler(event, self=self, model_name_df_list = (model_name, df_list)):
+                    return self.generate_csvs(event,model_name_df_list)
+                export_csv_button.bind("<Button-1>", handler)
+
+    def generate_csvs(self,event,model_name_df_list):
+        model_name = model_name_df_list[0]
+        df_list = model_name_df_list[1]
+        save_directory = tk.filedialog.askdirectory(mustexist = True, title = 'Selecione o diretório em que deseja salvar o(s) arquivo(s) CSV(s)')
+        if not save_directory == '':
+            for (i,df) in enumerate(df_list):
+                df.to_csv(save_directory + '/veritas_'+ model_name + str(i) + '.csv', encoding='utf-8')
 
     def download_image(self,image,image_path):
         save_directory = tk.filedialog.askdirectory(mustexist = True, title = 'Selecione o diretório em que deseja salvar a imagem')
@@ -681,11 +718,15 @@ class StatisticsOptionsView(View):
         # Set content font
         pdf.set_font('helvetica','',10)
         for printable in model_output:
-            if printable.endswith('.png') or printable.endswith('.jpeg'):
-                # It's a png image
-                pdf.image(printable, x = -0.5, w = pdf.w+1)
-            elif isinstance(printable,str):
-                pdf.multi_cell(0,6,printable, ln = True, align='L')
+            if isinstance(printable,pd.DataFrame):
+                printable = printable.T.head(5).T.to_string(justify='right',max_colwidth = 30)
+            if isinstance(printable,str):
+                if printable.endswith('.png') or printable.endswith('.jpeg'):
+                    # It's a png image
+                    pdf.image(printable, x = -0.5, w = pdf.w+1)
+                else:
+                    printable = printable.encode('latin-1', 'replace').decode('latin-1')
+                    pdf.multi_cell(0,6,printable, ln = True, align='L')
             else:
                 raise TypeError('Models output list must contain only strings (Text) or path to png/jpeg image')
 

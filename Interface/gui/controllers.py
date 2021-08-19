@@ -124,7 +124,8 @@ class StatisticsController(Controller):
                 extra_input = self.models_view_dict_list[options_view_index-1][model_name].get_extra_input()
             else:
                 extra_input = None
-            output[model_name] = self.models_dict[model_name].execute(data, extra_input)
+            # Delivers a copy to the models so it doesnt cause inconsistency
+            output[model_name] = self.models_dict[model_name].execute(data.copy(), extra_input)
 
         # Generates output on the screen
         self.statistics_options_view_list[options_view_index].generate_output(output)
