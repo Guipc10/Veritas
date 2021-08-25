@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk as ttk
 from  gui.controllers import FilesController, Controller, StatisticsController
 from gui.views import LoadFilesView, View, StatisticsOptionsView, QueryView, CountDocumentsView
-from gui.models import LoadFilesModel, TestModel, CountDocuments, MatchNames
+from gui.models import LoadFilesModel, TestModel, CountDocuments, MatchNames, WordCloud
 from gui.util.helper_classes import ScrollFrame
 
 class Application(ttk.Frame):
@@ -60,7 +60,7 @@ if __name__ == '__main__':
     load_files_view = app.add_module(controller = files_controller, view = LoadFilesView)
     query_view = app.add_module(controller = files_controller, view = QueryView)
 
-    statistics_controller = StatisticsController(load_files_model, load_files_view)
+    statistics_controller = StatisticsController(load_files_model, load_files_view, root)
 
     # Link the controllers
     files_controller.bind_statistics_controller(statistics_controller)
@@ -68,11 +68,13 @@ if __name__ == '__main__':
     #testModel = TestModel()
     countDocuments = CountDocuments()
     matchNames = MatchNames()
+    wordCloud = WordCloud()
 
     # The View class is passed instantiated
     #app.add_module(controller = statistics_controller, view = None, model = testModel)
     app.add_module(controller = statistics_controller, view = CountDocumentsView, model = countDocuments)
     app.add_module(controller = statistics_controller, view = None, model = matchNames)
+    app.add_module(controller = statistics_controller, view = None, model = wordCloud)
 
     app.add_module(controller = statistics_controller, view = StatisticsOptionsView)
 

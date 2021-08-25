@@ -496,9 +496,10 @@ class StatisticsOptionsView(View):
         self.button_font = ('Helvetica',10)
         self.verytiny_font = ('Helvetica',8)
         self.style.configure("TButton",background=self.background, font = self.button_font)
-        self.style.configure("Bold.TButton",background=self.background, font = ('Helvetica',10,'bold'))
+        self.style.configure("Bold.TButton",background=self.background, font = ('Helvetica',15,'bold'))
         self.style.configure("TFrame",background=self.background)
         self.style.configure("TLabel",background=self.background,font=self.std_font)
+        self.style.configure("Small.TLabel",background=self.background,font=('Helvetica',8,'italic'))
         self.style.configure("Subtitle.TLabel",background=self.background,font=('Helvetica',15,'bold'))
         self.style.configure("Header.TLabel",background=self.background,font=('Helvetica',20,'bold'))
         self.style.configure('TCheckbutton', background=self.background)
@@ -578,6 +579,26 @@ class StatisticsOptionsView(View):
                 selected_models_name.append(self.options_label_list[i].cget('text'))
         return selected_models_name
 
+    def start_progress_window(self):
+        #tk.messagebox.showinfo('oi','oi')
+        self.popup = tk.Toplevel()
+
+        self.popup_label = ttk.Label(self.popup, text = 'Por favor aguarde, as estatísticas estão sendo geradas.')
+        self.popup_label.grid(row=0, column=0, pady=10)
+
+        self.progress_bar = ttk.Progressbar(self.popup, orient='horizontal', mode='indeterminate')
+        self.progress_bar.grid(row=1,column=0,pady=10)
+        self.progress_bar.start()
+
+    def finish_progress_window(self):
+
+        self.popup_label.config(text='Estatísticas geradas com sucesso!')
+
+        self.progress_bar.stop()
+        self.progress_bar.grid_forget()
+
+        self.close_popup_button = ttk.Button(self.popup, text = 'OK', command=self.popup.withdraw)
+        self.close_popup_button.grid(row=1,column=0,pady=10)
     def generate_output(self, output_dict):
         '''
         Generates the output of the models on the screen
@@ -636,9 +657,10 @@ class StatisticsOptionsView(View):
                     # Also convert it to string and insert it's first 5 columms as a text
                     all_columns = line.columns
                     all_columns_str = str(list(all_columns))
-                    text_box.insert(tk.END,f'Há um total de {len(all_columns)} colunas:\n\n','left')
-                    text_box.insert(tk.END,all_columns_str,'left')
-                    text_box.insert(tk.END,f'\n\nMas só as 5 primeiras são mostradas abaixo, exporte para CSV para obter todas:\n\n','left')
+                    if len(all_columns) > 5:
+                        text_box.insert(tk.END,f'Há um total de {len(all_columns)} colunas:\n\n','left')
+                        text_box.insert(tk.END,all_columns_str,'left')
+                        text_box.insert(tk.END,f'\n\nMas só as 5 primeiras são mostradas abaixo, exporte para CSV para obter todas:\n\n','left')
                     # MAYBE THE LINE VARIABLE WONT BE MODIFIED AND WILL OCCUR AN ERROR WHEN GENERATING THE PDF
                     line = line.T.head(5).T.to_string(justify='center',max_colwidth = 30)
                     text_box.insert(tk.END,line,'left')
@@ -669,23 +691,55 @@ class StatisticsOptionsView(View):
             # Read only
             text_box.config(state=tk.DISABLED)
 
+            number_buttons = 0
+
             # Export to PDF button
-            # Create for the button(s)
+            # Create frame the button(s)
             buttons_frame = ttk.Frame(frame)
             buttons_frame.grid(row = 2, column = 0, pady = 10)
             export_pdf_button = ttk.Button(buttons_frame, text = 'Exportar para PDF')
-            export_pdf_button.grid(row = 0, column = 0)
+            export_pdf_button.grid(row = 0, column = number_buttons)
             def handler(event, self=self, output = (model_name, model_output)):
                 return self.generate_pdf(event,output)
             export_pdf_button.bind("<Button-1>", handler)
+            number_buttons += 1
 
-            # Export to CSV button
+            # Export to CSV and JSON button
             if export_to_csv:
-                export_csv_button = ttk.Button(buttons_frame, text = 'Exportar DataFrame(s) para CSV(s)')
-                export_csv_button.grid(row = 0, column = 1, padx = 10)
+                export_csv_button = ttk.Button(buttons_frame, text = 'Exportar tabela(s) de dado(s) para CSV')
+                export_csv_button.grid(row = 0, column = number_buttons, padx = 10)
                 def handler(event, self=self, model_name_df_list = (model_name, df_list)):
                     return self.generate_csvs(event,model_name_df_list)
                 export_csv_button.bind("<Button-1>", handler)
+                number_buttons += 1
+
+                export_json_button = ttk.Button(buttons_frame, text = 'Exportar tabela(s) de dado(s) para JSON')
+                export_json_button.grid(row = 0, column = number_buttons, padx = 10)
+                def handler(event, self=self, model_name_df_list = (model_name, df_list)):
+                    return self.generate_jsons(event,model_name_df_list)
+                export_json_button.bind("<Button-1>", handler)
+                number_buttons += 1
+
+            # Help button
+            def handler(self=self,number_buttons = number_buttons):
+                pdf_and_json = number_buttons > 1
+                return self.show_button_help(pdf_and_json)
+            help_button = ttk.Button(buttons_frame, text = '?',width = SMALL_BUTTON_WIDTH, command = handler, style='Bold.TButton')
+            help_button.grid(row = 0, column = number_buttons, padx=30)
+
+    def show_button_help(self, pdf_and_json):
+        description = 'Exportar para PDF: exporta exatamente o que está mostrado acima para PDF.\n(caso alguma coluna de uma tabela de dados tenha sido omitida acima, ela também estará omitida no PDF)\n\n'
+        if pdf_and_json:
+            description += 'Exportar para CSV: exporta a(s) tabela(s) de dados completa(s) para CSV, caso algumas colunas não tenham sido mostradas acima, elas estarão no CSV.\n(caso exista mais de uma tabela, será gerado um arquivo para cada)\n\n '
+            description += 'Exporta a(s) tabela(s) de dados completa(s) para JSON, o arquivo JSON pode ser utilizado para gerar uma outra consulta sobre estes novos dados.\n(caso exista mais de uma tabela, será gerado um arquivo para cada)'
+        tk.messagebox.showinfo('O que faz cada botão?', description)
+    def generate_jsons(self,event,model_name_df_list):
+        model_name = model_name_df_list[0]
+        df_list = model_name_df_list[1]
+        save_directory = tk.filedialog.askdirectory(mustexist = True, title = 'Selecione o diretório em que deseja salvar o(s) arquivo(s) JSON(s)')
+        if not save_directory == '':
+            for (i,df) in enumerate(df_list):
+                df.to_json(save_directory + '/veritas_'+ model_name + str(i) + '.json')
 
     def generate_csvs(self,event,model_name_df_list):
         model_name = model_name_df_list[0]

@@ -1,6 +1,10 @@
 from abc import ABC, abstractmethod
 from gui.views import LoadFilesView, View, StatisticsOptionsView, QueryView
 from gui.models import LoadFilesModel, ComponentModel
+import threading
+from icecream import ic
+import time
+import queue
 
 class Controller(ABC):
     @abstractmethod
@@ -67,8 +71,26 @@ class FilesController(Controller):
         #(filters_dict, view_filters_list) = self.tab_filters_list[index]
         self.model.save_json(data)
 
+class ThreadedExecute(threading.Thread):
+    def __init__(self, model,model_name, data, extra_input, output_dict, queue):
+        super().__init__()
+        self.model = model
+        self.model_name = model_name
+        self.data = data
+        self.extra_input = extra_input
+        self.output_dict = output_dict
+        self.queue = queue
+
+    def run(self):
+        output = self.model.execute(self.data, self.extra_input)
+        self.output_dict[self.model_name] = output
+        # Remove the process from the queue
+        ic('process finished')
+        self.queue.get_nowait()
+        ic('queue:', self.queue.qsize())
+
 class StatisticsController(Controller):
-    def __init__(self, model: LoadFilesModel, view: LoadFilesView):
+    def __init__(self, model: LoadFilesModel, view: LoadFilesView, root):
         self.load_files_model = model
         self.load_files_view = view
         self.statistics_options_view_list = []
@@ -76,6 +98,7 @@ class StatisticsController(Controller):
         self.models_view_dict = {}
         # List of dictionaries so each tab has it own instance of the model's view
         self.models_view_dict_list = []
+        self.root = root
 
     def bind(self,view: View, **kwargs):
 
@@ -104,7 +127,26 @@ class StatisticsController(Controller):
             all_descriptions[model_name] = model.get_description()
         return all_descriptions
 
+    #def generate_statistics_thread(self,options_view_index, data):
+    def check_thread(self, options_view_index, my_queue, output_dict):
+        if my_queue.empty():
+            # all threads are finished
+            # Generates output on the screen
+            self.statistics_options_view_list[options_view_index].generate_output(output_dict)
+
+            self.statistics_options_view_list[options_view_index].finish_progress_window()
+        else:
+            def handler(options_view_index=options_view_index, my_queue=my_queue, output_dict=output_dict):
+                return self.check_thread(options_view_index, my_queue, output_dict)
+            ic('process still running')
+            self.root.after(10, handler)
+
     def generate_statistics(self, event, options_view_index, data):
+        #self.statistics_options_view_list[options_view_index].start_progress_window()
+
+
+        #threading.Thread(target=self.generate_statistics_thread, args=(options_view_index, data,).start()
+
         #get a list of names of the models that are going to be used
         selected_models = self.statistics_options_view_list[options_view_index].get_selected_models()
 
@@ -119,13 +161,27 @@ class StatisticsController(Controller):
         # Output is dict, where the key is the name of the model and the items are its content:
         # a list of strings and images
         output = {}
+
+        my_queue = queue.Queue()
         for model_name in selected_models:
             if self.models_dict[model_name].requires_extra_input():
                 extra_input = self.models_view_dict_list[options_view_index-1][model_name].get_extra_input()
             else:
                 extra_input = None
-            # Delivers a copy to the models so it doesnt cause inconsistency
-            output[model_name] = self.models_dict[model_name].execute(data.copy(), extra_input)
 
-        # Generates output on the screen
+            # Do the rest of the work in a different thread so the progress bar can be shown
+            # puts a random item to the queue because its going to be used only for tracking the still running threads
+            # ic('new process')
+            #my_queue.put(1)
+            # ic('queue:', my_queue.qsize())
+            # Delivers a copy of the data to the models so it doesnt cause inconsistency
+            #ThreadedExecute(self.models_dict[model_name],model_name, data.copy(), extra_input, output, my_queue).start()
+
+            output[model_name] = self.models_dict[model_name].execute(data.copy(), extra_input)
+        # Schedule a periodic check on the threads
+        # def handler(options_view_index=options_view_index, queue=my_queue, output_dict=output):
+        #     return self.check_thread(options_view_index, queue, output_dict)
+        # self.root.after(10, handler)
         self.statistics_options_view_list[options_view_index].generate_output(output)
+
+        #self.statistics_options_view_list[options_view_index].finish_progress_window()

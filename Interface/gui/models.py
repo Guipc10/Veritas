@@ -9,6 +9,7 @@ import numpy as np
 import re
 import unidecode
 from icecream import ic
+#from wordcloud import WordCloud, STOPWORDS
 
 # All new modules have to inherit from this class
 TEXT_WIDGET_WIDTH = 160
@@ -294,7 +295,7 @@ class CountDocuments(ComponentModel):
                 absolute_count = df[column].value_counts()
                 relative_count = df[column].value_counts(normalize = True)
                 tmp_df = pd.DataFrame({'Absoluto': absolute_count, 'Relativo' : relative_count})
-                output.append(tmp_df.to_string(justify='right'))
+                output.append(tmp_df)
                 if extra_input['bar_selected'] == 1:
                     # add a line break so the names can be read
                     bar_df = tmp_df.copy()
@@ -333,13 +334,13 @@ class CountDocuments(ComponentModel):
 
 class MatchNames(ComponentModel):
     def get_name(self):
-        return 'Match Names'
+        return 'Agrupar pares'
 
     def requires_extra_input(self):
         return False
 
     def get_description(self):
-        return 'Encontra pessoas que estão envolvidas em mais de um processo'
+        return 'Encontra pares de pessoas que estão juntamente envolvidas em mais de um processo'
 
     def isNaN(self, string):
         return string != string
@@ -460,38 +461,38 @@ class MatchNames(ComponentModel):
         new_data = data.copy()
 
         # Sort so the order doesnt matter
-        new_data[['autor','réu']] = np.sort(new_data[['autor','réu']].astype('str'), axis = 1)
+        new_data[['parte1','parte2']] = np.sort(new_data[['autor','réu']].astype('str'), axis = 1)
 
-        data_grouped_count = new_data.groupby(['autor','réu']).size()
+        data_grouped_count = new_data.groupby(['parte1','parte2']).size()
         data_count = pd.DataFrame({'Número de Aparições': data_grouped_count})
         not_unique = data_count.loc[data_count['Número de Aparições'] > 1]
         n_pairs = len(data_count)
         not_unique_pairs = len(not_unique)
 
         # Merge to recover process code
-        merged_pairs = not_unique.merge(new_data, left_index = True, right_on = ['autor','réu'])
+        merged_pairs = not_unique.merge(new_data, left_index = True, right_on = ['parte1','parte2'])
 
         # Drop null values
         merged_pairs = merged_pairs.replace(['nan',''],np.nan)
         merged_pairs = merged_pairs.dropna()
 
         # Assign a number to each group
-        merged_pairs['grupo'] = merged_pairs.groupby(['autor','réu']).ngroup()
+        merged_pairs['grupo'] = merged_pairs.groupby(['parte1','parte2']).ngroup()
+        merged_pairs['grupo'] = merged_pairs['grupo'] + 1
         merged_pairs.set_index('grupo', inplace = True)
-        merged_pairs.rename(columns = {'Número de Aparições': 'tamanho_grupo', 'autor': 'parte1', 'réu': 'parte2'}, inplace=True)
-        merged_pairs.drop(columns=['pagina'],inplace = True)
+        merged_pairs.rename(columns = {'Número de Aparições': 'tamanho_grupo'}, inplace=True)
+        merged_pairs.drop(columns=['pagina','parte1','parte2'],inplace = True)
 
         # Rearrange column order
         columns = list(merged_pairs.columns)
-        columns.remove('parte1')
-        columns.remove('parte2')
-        ic(columns)
-        merged_pairs = merged_pairs[['parte1','parte2']+columns]
+        columns.remove('autor')
+        columns.remove('réu')
+        merged_pairs = merged_pairs[['autor','réu']+columns]
 
         print(f'Pares que estão em mais de 1 documento: {(not_unique_pairs/n_pairs)*100}%')
         return [merged_pairs]
 
-    def execute(self,data, extra_input = None):
+    def execute(self,data, extra_input):
         output = []
 
         # Extract author and defendant from the text, add it as two new columns
@@ -502,8 +503,43 @@ class MatchNames(ComponentModel):
 
         # Find the pair of people that appear together in more than one document
         output += self.search_pairs(data)
-
         return output
+        # output_dict[self.get_name()] = output
+        # ic(output_dict)
+
+class WordCloud(ComponentModel):
+    def get_name(self):
+        return 'Nuvem de Palavras'
+
+    def requires_extra_input(self):
+        return False
+
+    def get_description(self):
+        return 'Gera uma nuvem de palavras a partir do inteiro teor dos documentos.'
+
+    def execute(self,data, extra_input):
+        # Define the stopwords
+        stopwords = set(STOPWORDS)
+        # Unite it with the portuguese stopwords
+        pt_stopwords = []
+        cwd = os.getcwd()
+        with open(cwd+'/gui/util/stopwords.txt') as f:
+            [pt_stopwords.append(word) for word in f]
+        stopwords = stopwords.union(pt_stopwords)
+        print(stopwords)
+        # Generate and save the wordcloud image
+        wc = WordCloud(min_font_size=10,
+               max_font_size=300,
+               background_color='white',
+               mode="RGB",
+               stopwords=stopwords,
+               width=2000,
+               height=1000,
+               normalize_plurals= True).generate(data['julgado'])
+        plt.figure(figsize=(20,10))
+        plt.imshow(wc,interpolation='bilinear')
+        plt.savefig(cwd+'/images/'+'nuvem_palavras'+'.png')
+        output.append(cwd+'/images/'+'nuvem_palavras'+'.png')
 
 # class DateGraph(ComponentModel):
 #     def get_name():
