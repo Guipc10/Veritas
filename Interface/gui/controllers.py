@@ -67,7 +67,7 @@ class FilesController(Controller):
         #(filters_dict, view_filters_list) = self.tab_filters_list[index]
         self.model.save_csv(data)
 
-    def export_to_json(self, event, index):
+    def export_to_json(self, event, data):
         #(filters_dict, view_filters_list) = self.tab_filters_list[index]
         self.model.save_json(data)
 

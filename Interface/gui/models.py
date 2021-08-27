@@ -233,13 +233,13 @@ class LoadFilesModel():
         df = pd.DataFrame.from_records(data)
         save_directory = tk.filedialog.askdirectory(mustexist = True, title = 'Selecione o diretório em que deseja salvar o arquivo CSV')
         if not save_directory == '':
-            df.to_csv(save_directory + '/veritas_consulta' + str(index) + '.csv', encoding='utf-8')
+            df.to_csv(save_directory + '/veritas_consulta' + '.csv', encoding='utf-8')
 
     def save_json(self, data):
         df = pd.DataFrame.from_records(data)
         save_directory = tk.filedialog.askdirectory(mustexist = True, title = 'Selecione o diretório em que deseja salvar o arquivo JSON')
         if not save_directory == '':
-            with open(save_directory + '/veritas_consulta' + str(index) + '.json', 'w', encoding='utf-8') as file:
+            with open(save_directory + '/veritas_consulta' + '.json', 'w', encoding='utf-8') as file:
                 df.to_json(file, orient='records', force_ascii=False)
 
 class TestModel(ComponentModel):
@@ -348,28 +348,55 @@ class MatchNames(ComponentModel):
     def extract_people(self, data):
         #author_pattern = re.compile(r'\n')
         #author_pattern = re.compile('(.+?)(?=\n)')
+
+        # Drop duplicated documents
+        if 'duplicado' in data.columns:
+            data.drop_duplicates(subset = ['processo'], inplace=True)
+
         authors = []
         defendants = []
-        general_pattern = re.compile(r'(Autor|Autora|Autor e Parte|Requerente|Requerente (s)|Impetrante|Exequente|Exeqüente|Embargante|Demandante|MAGISTRADO|Herdeiro|Inventariante|Inventariante (Ativo)|Inventariante (Ativo)):\s(.+?)(?=(Justiça Gratuita|Juiz|Juíza|Prioridade Idoso|Artigo da|Conclusão|CONCLUSÃO|C O N C L U S Ã O|Réu Preso|Descrição|Data da identificação|Vistos|VISTOS|Controle))')
+        victims = []
+        main_pattern_string = r'(Autor|Autora|Autor e Parte|Requerente|Requerente (s)|Impetrante|Exequente|Exeqüente|Embargante|Demandante|MAGISTRADO|Herdeiro|Inventariante|Inventariante (Ativo)|Inventariante (Ativo)):\s(.+?)(?=(Justiça Gratuita|Juiz|Juíza|Promotor de Justiça|Prioridade Idoso|Aos|Em \d\d|Autos n|ATA D|Ata d|Data da|Artigo da|Conclusão|CONCLUSÃO|C O N C L U S Ã O|SENTENÇA|Réu Preso|Descrição|Data da identificação|Vistos|VISTOS|Controle|Processo))'
+        general_pattern = re.compile(main_pattern_string)
         i = 0
         print_index = 99999
-        for text in data['julgado']:
+        processo = '0'
+        for i,text in enumerate(data['julgado']):
             author = np.NaN
             defendant = np.NaN
-            if i == print_index:
+            victim = np.NaN
+            if i == print_index or data.iloc[i]['processo'] == processo:
                 print(text)
             sentence = general_pattern.search(text)
             if sentence:
-                #print('Sentença: ',sentence.group())
+                # Check if there is a victim
+                check_victim_pattern = re.compile(r'(Vítima|Vitima)')
+                check_victim_search = check_victim_pattern.search(sentence.group())
+                if check_victim_search:
+                    # There is the name of the victim in the text
+                    victim_pattern = re.compile(r'(?<=(Vítima|Vitima)).*')
+                    victim_search = victim_pattern.search(sentence.group())
+                    if victim_search:
+                        victim = victim_search.group()
+                        if i == print_index or data.iloc[i]['processo'] == processo:
+                            print(f'\n\vítima: ', victim_search.group())
+                            print('vitima real=', victim)
+                    # get the remaining text without the victim
+                    no_victim_pattern = re.compile(r'.*(?=\s(Vítima|Vitima))')
+                    no_victim_search = no_victim_pattern.search(sentence.group())
+
+                    if no_victim_search:
+                        sentence = no_victim_search
+
                 # First get the phrase without the first colon
                 remove_first_colon_pattern = re.compile(r'(?<=:\s).*')
                 no_first_colon_search = remove_first_colon_pattern.search(sentence.group())
-                if i == print_index:
+                if i == print_index or data.iloc[i]['processo'] == processo:
                     print(f'\n\nsentence: ', sentence.group())
                 if no_first_colon_search:
                     # Now get the author, which is the text before the word that is before the remaining colon
                     #author_pattern = re.compile(r'(?<=:\s).*(?=\s(\S+):)')
-                    if i == print_index:
+                    if i == print_index or data.iloc[i]['processo'] == processo:
                         print(f'\n\nno_first_colon_search: ', no_first_colon_search.group())
                     author_pattern = re.compile(r'.*(?=\s(\S*):)')
                     author_search = author_pattern.search(no_first_colon_search.group())
@@ -392,37 +419,73 @@ class MatchNames(ComponentModel):
                         author = no_first_colon_search.group()
             else:
                 # check if there is only information about the defendant
-                pattern = re.compile(r'(Réu):\s(.+?)(?=(Justiça Gratuita|Juiz|Juíza|Prioridade Idoso|Conclusão|CONCLUSÃO|C O N C L U S Ã O|Réu Preso|Descrição|Vistos))')
+                pattern = re.compile(main_pattern_string)
                 sentence = pattern.search(text)
                 if sentence:
+                    check_victim_pattern = re.compile(r'(Vítima|Vitima)')
+                    check_victim_search = check_victim_pattern.search(sentence.group())
+                    if check_victim_search:
+                        # There is the name of the victim in the text
+                        victim_pattern = re.compile(r'(?<=(Vítima|Vitima)).*')
+                        victim_search = victim_pattern.search(sentence.group())
+                        if victim_search:
+                            victim = victim_search.group()
+
+                        # get the remaining text without the victim
+                        no_victim_pattern = re.compile(r'.*(?=\s(Vítima|Vitima))')
+                        no_victim_search = no_victim_pattern.search(sentence.group())
+
+                        if no_victim_search:
+                            sentence = no_victim_search
+
                     remove_first_colon_pattern = re.compile(r'(?<=:\s).*')
                     no_first_colon_search = remove_first_colon_pattern.search(sentence.group())
                     if no_first_colon_search:
                         defendant = no_first_colon_search.group()
 
             # Remove authors and defendants that are too long and therefore are probably wrong
-            if len(str(author)) > 100:
-                author = np.nan
-            if len(str(defendant)) > 100:
-                defendant = np.nan
-            # Remove extra whitespaces and pontuation
+            # if len(str(author)) > 100:
+            #     author = np.nan
+            # if len(str(defendant)) > 100:
+            #     defendant = np.nan
+            # if len(str(victim)) > 100:
+            #     victim = np.nan
+            # Remove extra whitespaces and colon
             if not self.isNaN(author):
-                author = str(author).strip()
-                #author = str(unidecode.unidecode(author))
+                author = self.clean_extraction(author)
+
             if not self.isNaN(defendant):
-                defendant = str(defendant).strip()
-                #defendant = str(unidecode.unidecode(defendant))
+                defendant = self.clean_extraction(defendant)
+            if not self.isNaN(victim):
+                victim = self.clean_extraction(victim)
             authors.append(author)
             defendants.append(defendant)
+            victims.append(victim)
             i = i+1
         data['autor'] = authors
         data['réu'] = defendants
+        data['vítima'] = victims
         null_authors = data['autor'].isnull().sum()
         null_defendants = data['réu'].isnull().sum()
+        null_victims = data['vítima'].isnull().sum()
         rows = len(data)
-        print(f'autores faltantes: {(null_authors/rows)*100}%\n\nréus faltantes:{(null_defendants/rows)*100}%')
+        print(f'autores faltantes: {(null_authors/rows)*100}%\nréus faltantes:{(null_defendants/rows)*100}%\nvítimas faltantes:{(null_victims/rows)*100}%\n')
         return data
 
+    def clean_extraction(self, string):
+        string = re.sub(':', '', string)
+        string = re.sub('- presente', '', string)
+        string = re.sub('- ausente', '', string)
+        string = re.sub('– presente', '', string)
+        string = re.sub('– ausente', '', string)
+        # Remove text after comma
+        string = re.sub(',.*', '', string)
+        string = re.sub('Réu.*', '', string)
+        string = re.sub('Advogado.*', '', string)
+        string = re.sub('e outro.*', '', string)
+        string = str(string).strip()
+        return string
+        #author = str(unidecode.unidecode(author))
     def search_single_person(self,data):
         author_city_grouped_count = data.groupby(['comarca','autor'], as_index = True).size()
         author_city_grouped = data.groupby(['comarca','autor'], as_index = False)
@@ -458,23 +521,23 @@ class MatchNames(ComponentModel):
 
     def search_pairs(self,data):
         # Copy so it doesnt cause inconsistency
-        new_data = data.copy()
+        new_data = data.copy().astype('str')
 
+        # The part to be considered is the victim if it exists and the author otherwise
+        new_data['parte1'] = np.where(new_data['vítima'] == 'nan', new_data['autor'], new_data['vítima'])
+        new_data['parte2'] = new_data['réu']
+        # Remove missing values
+        new_data = new_data.dropna(axis = 0, how='any', subset=['parte1','parte2'])
         # Sort so the order doesnt matter
-        new_data[['parte1','parte2']] = np.sort(new_data[['autor','réu']].astype('str'), axis = 1)
+        new_data[['parte1','parte2']] = np.sort(new_data[['parte1','parte2']].astype('str'), axis = 1)
 
         data_grouped_count = new_data.groupby(['parte1','parte2']).size()
         data_count = pd.DataFrame({'Número de Aparições': data_grouped_count})
         not_unique = data_count.loc[data_count['Número de Aparições'] > 1]
         n_pairs = len(data_count)
-        not_unique_pairs = len(not_unique)
 
         # Merge to recover process code
         merged_pairs = not_unique.merge(new_data, left_index = True, right_on = ['parte1','parte2'])
-
-        # Drop null values
-        merged_pairs = merged_pairs.replace(['nan',''],np.nan)
-        merged_pairs = merged_pairs.dropna()
 
         # Assign a number to each group
         merged_pairs['grupo'] = merged_pairs.groupby(['parte1','parte2']).ngroup()
@@ -487,7 +550,16 @@ class MatchNames(ComponentModel):
         columns = list(merged_pairs.columns)
         columns.remove('autor')
         columns.remove('réu')
-        merged_pairs = merged_pairs[['autor','réu']+columns]
+        columns.remove('vítima')
+        # columns.remove('parte1')
+        # columns.remove('parte2')
+        merged_pairs = merged_pairs[['autor','réu','vítima']+columns]
+
+        # Drop the victim column if its full o nan values
+        merged_pairs = merged_pairs.replace(['nan',''],np.nan)
+        merged_pairs = merged_pairs.dropna(axis=1, how='all')
+
+        not_unique_pairs = len(merged_pairs)
 
         print(f'Pares que estão em mais de 1 documento: {(not_unique_pairs/n_pairs)*100}%')
         return [merged_pairs]
@@ -496,7 +568,7 @@ class MatchNames(ComponentModel):
         output = []
 
         # Extract author and defendant from the text, add it as two new columns
-        self.extract_people(data)
+        data = self.extract_people(data)
 
         # Find the people that are part of more than one document
         #output += self.search_single_person(data)
