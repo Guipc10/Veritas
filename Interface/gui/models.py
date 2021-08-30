@@ -9,6 +9,7 @@ import numpy as np
 import re
 import unidecode
 from icecream import ic
+from genderbr import get_gender
 #from wordcloud import WordCloud, STOPWORDS
 
 # All new modules have to inherit from this class
@@ -519,6 +520,20 @@ class MatchNames(ComponentModel):
 
         return [author_defendant_merge]
 
+    def is_person(self, name_series):
+        is_name_list = []
+        for name in name_series:
+            first_name = name.split()[0]
+            print(first_name)
+            if get_gender(first_name) != None:
+                print('is person\n')
+                is_name_list.append(True)
+            else:
+                # It's not a person
+                print('is not a person\n')
+                is_name_list.append(False)
+        return np.array(is_name_list)
+
     def search_pairs(self,data):
         # Copy so it doesnt cause inconsistency
         new_data = data.copy().astype('str')
@@ -526,15 +541,27 @@ class MatchNames(ComponentModel):
         # The part to be considered is the victim if it exists and the author otherwise
         new_data['parte1'] = np.where(new_data['vítima'] == 'nan', new_data['autor'], new_data['vítima'])
         new_data['parte2'] = new_data['réu']
+
+        # Remove companies, government institutions, etc.
+        # new_data['parte1'] = np.where(self.is_person(new_data['parte1']), new_data['parte1'], np.nan)
+        # new_data['parte2'] = np.where(self.is_person(new_data['parte2']), new_data['parte2'], np.nan)
+        new_data['parte1'] = np.where(new_data['parte1'].str.lower().str.contains('justiça pública', regex=False, na=False), np.nan, new_data['parte1'])
+        new_data['parte2'] = np.where(new_data['parte2'].str.lower().str.contains('justiça pública', regex=False, na=False), np.nan, new_data['parte2'])
+
         # Remove missing values
+        new_data = new_data.replace(['nan','','NaN'],np.nan)
         new_data = new_data.dropna(axis = 0, how='any', subset=['parte1','parte2'])
+
         # Sort so the order doesnt matter
+        new_data['parte1'] = new_data['parte1'].map(lambda x: x.lower() if isinstance(x,str) else x)
+        new_data['parte2'] = new_data['parte2'].map(lambda x: x.lower() if isinstance(x,str) else x)
         new_data[['parte1','parte2']] = np.sort(new_data[['parte1','parte2']].astype('str'), axis = 1)
 
         data_grouped_count = new_data.groupby(['parte1','parte2']).size()
         data_count = pd.DataFrame({'Número de Aparições': data_grouped_count})
         not_unique = data_count.loc[data_count['Número de Aparições'] > 1]
         n_pairs = len(data_count)
+        not_unique_pairs = len(not_unique)
 
         # Merge to recover process code
         merged_pairs = not_unique.merge(new_data, left_index = True, right_on = ['parte1','parte2'])
@@ -559,17 +586,17 @@ class MatchNames(ComponentModel):
         merged_pairs = merged_pairs.replace(['nan',''],np.nan)
         merged_pairs = merged_pairs.dropna(axis=1, how='all')
 
-        not_unique_pairs = len(merged_pairs)
-
         print(f'Pares que estão em mais de 1 documento: {(not_unique_pairs/n_pairs)*100}%')
         return [merged_pairs]
 
     def execute(self,data, extra_input):
         output = []
-
         # Extract author and defendant from the text, add it as two new columns
         data = self.extract_people(data)
-
+        gender1 = get_gender('Guilherme')
+        gender2 = get_gender('Justíça Pública')
+        print(gender1)
+        print(gender2)
         # Find the people that are part of more than one document
         #output += self.search_single_person(data)
 
