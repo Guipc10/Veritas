@@ -62,7 +62,7 @@ for (i in seq_along(sub_folders)){
 #################################################2º grau####################################################################################
 baixar_cjsg(diretorio = "/home/guilherme/Unicamp/IC_2021/Downloads", livre = "homofobia",inicio = "31/10/2018",fim = "30/10/2019")
 
-jsg_table <- ler_cjsg(diretorio = "/home/guilherme/Unicamp/IC_2021/Downloads")
+jsg_table <- ler_cjpg(diretorio = "/home/guilherme/Unicamp/Veritas/Downloads")
 #Lê inteiro teor
 
 #links = paste("https://esaj.tjsp.jus.br/cjsg/getArquivo.do?cdAcordao=",jsg_table$cdacordao,"&cdForo=0",sep="")
@@ -73,7 +73,7 @@ jsg_table <- ler_cjsg(diretorio = "/home/guilherme/Unicamp/IC_2021/Downloads")
 
 json_table_jsg <- toJSON(jsg_table,pretty=TRUE)
 
-jsg_file <- file("/home/guilherme/Unicamp/IC_2021/Downloads/test_jsg.json")
+jsg_file <- file("/home/guilherme/Unicamp/Veritas/padrao.json")
 write(json_table_jsg,jsg_file)
 close(jsg_file)
 

@@ -6,9 +6,6 @@ from abc import ABC, abstractmethod
 from dateutil.parser import parse
 import matplotlib.pyplot as plt
 import pandas as pd
-import dask.dataframe as dd
-import dask.array as da
-import dask.bag as db
 import numpy as np
 import re
 import unidecode
@@ -60,31 +57,6 @@ class ComponentModel():
         '''
         raise NotImplementedError
 
-def myfunc(x):
-    #print(f'x antes:\n{x}')
-
-    #print(f'x antes é {x} type = ', type(x))
-    x = x.replace('\n','')
-    x = x.strip()
-    x = x.replace('[','')
-    x = x.replace(']','')
-    x = x.replace('},','}')
-    #print(f'x depois:\n{x}')
-    # Caso de problema no jsondecoder
-    # if (len(x) < 100):
-    #     print(f'x é {x} type = ', type(x))
-    try:
-        return json.loads(x)
-    except json.JSONDecodeError as err:
-        # grab a reasonable section, say 40 characters.
-        # start, stop = max(0, err.pos - 20), err.pos + 20
-        # snippet = err.doc[start:stop]
-        print(err)
-        print(err.doc)
-        # print('... ' if start else '', snippet, ' ...' if stop < len(err.doc) else '', sep="")
-        # print('^'.rjust(21 if not start else 25))
-    return
-
 class LoadFilesModel():
 
     def __init__(self):
@@ -115,9 +87,20 @@ class LoadFilesModel():
         #I'M APPENDING TWO DIFFERENT TYPES OF JSON FILES HERE, 1 AND 2 DEGREE CASES, MAY CAUSE ERRORS
         df_list = []
         self.data_list.clear()
-        if len(self.json_files) > 0:
-            self.data = db.read_text(self.files_path.get()+'/*.json',linedelimiter="},\n", blocksize=2**28).map(myfunc).to_dataframe()
-            print(self.data)
+        for json_file in self.json_files:
+            with open(self.files_path.get() +'/'+ json_file,'r') as j:
+                json_df = pd.DataFrame.from_records(json.load(j))
+                if len(json_df) > 0:
+                    print('\n'+json_file+'\nmemória antes')
+                    print(json_df.info(memory_usage='deep'))
+                    json_df = json_df.drop(columns=['pagina'])
+                    json_df = json_df.astype({'classe':'category', 'assunto':'category', 'magistrado':'category','comarca':'category', 'foro':'category', 'vara':'category'})
+                    print('\nmemória depois')
+                    print(json_df.info(memory_usage='deep'))
+                    df_list.append(json_df)
+        # THIS CONCAT MAY CAUSE ERRORS WHEN USING 2 DIFFERENT TYPES OF DOCUMENTS, LIKE FIRST AND SECOND DEGREE ONES
+        self.data = pd.concat(df_list, sort = False)
+        print('Carregou o json em um dataframe, se chegou aqui é pq ta travando no processamento')
         self.all_keys = list(self.data.columns)
 
         #remove useless keys for filtering
@@ -125,12 +108,51 @@ class LoadFilesModel():
 
         #Get available metadata and it's possible values by iterating over the columns
         self.key_to_possible_values_dic.clear()
-        for column in self.data.columns:
+        for column in self.data:
             if column not in UNIQUE_KEYS:
-                print(column)
                 self.key_to_possible_values_dic[column] = np.sort(list(self.data[column].unique()))
 
         return self.all_keys, self.key_to_possible_values_dic
+
+    # def m_process_json(self):
+    #     try:
+    #         self.json_files = [json_file for json_file in os.listdir(self.files_path.get()) if json_file.endswith('.json')]
+    #     except FileNotFoundError:
+    #         Print("Arquivos não encontrados, o diretório indicado pode estar incorreto")
+    #
+    #     #I'M APPENDING TWO DIFFERENT TYPES OF JSON FILES HERE, 1 AND 2 DEGREE CASES, MAY CAUSE ERRORS
+    #     self.data_list.clear()
+    #     for json_file in self.json_files:
+    #         with open(self.files_path.get() +'/'+ json_file,'r') as j:
+    #             self.data_list.append(json.load(j))
+    #
+    #     #Get available metadata and it's possible values by iterating over the dictionaries
+    #     self.key_to_possible_values_dic.clear()
+    #     for file in self.data_list:
+    #         for dic in file:
+    #             for key,value in dic.items():
+    #                 if key not in self.key_to_possible_values_dic.keys():
+    #                     self.key_to_possible_values_dic[key] = set()
+    #                 self.key_to_possible_values_dic[key].add(value)
+    #
+    #     self.all_keys = list(self.key_to_possible_values_dic.keys()).copy()
+    #
+    #     UNIQUE_KEYS = ['ementa', 'processo', 'cdacordao', 'julgado', 'pagina', 'duplicado', 'cd_doc']
+    #     #remove useless keys from the metadata
+    #     for useless_key in UNIQUE_KEYS:
+    #         if useless_key in self.key_to_possible_values_dic.keys():
+    #             del self.key_to_possible_values_dic[useless_key]
+    #
+    #     #sort it alphabetically
+    #     for key in self.key_to_possible_values_dic.keys():
+    #         for value in self.key_to_possible_values_dic[key]:
+    #             break
+    #         if isinstance(value,int):
+    #             self.key_to_possible_values_dic[key] = sorted(self.key_to_possible_values_dic[key])
+    #         elif isinstance(value,str):
+    #             self.key_to_possible_values_dic[key] = sorted(self.key_to_possible_values_dic[key],key= str.lower)
+    #
+    #     return self.all_keys, self.key_to_possible_values_dic
 
     def is_date(self,string, fuzzy=False):
         """
@@ -160,7 +182,7 @@ class LoadFilesModel():
         # Apply visualization filter
         for column in df.columns:
             if column not in view_filters_list:
-                df = df.drop(column, axis=1)
+                df.drop(column, inplace=True, axis=1)
                 if column.capitalize() in filters_dict.keys():
                     del filters_dict[column.capitalize()]
 
@@ -171,19 +193,62 @@ class LoadFilesModel():
                 df = df.loc[filter]
 
         # Drop duplicated documents
-        df = df.drop_duplicates(subset = ['processo'])
+        df.drop_duplicates(subset = ['processo'], inplace=True)
         if 'duplicado' in df.columns:
-            df = df.drop(columns=['duplicado'])
+            df.drop(columns=['duplicado'], inplace=True)
 
         return df
+
+    # def apply_filters(self, filters_dict, view_filters_list):
+    #     new_data = []
+    #     column_delete_set = set()
+    #     for file in self.data_list:
+    #         for dic in file:
+    #             # make a copy so it doesnt change the original data
+    #             tmp_dict = dic.copy()
+    #             add_permission = True
+    #             for key,value in tmp_dict.items():
+    #                 if key not in view_filters_list:
+    #                     # This column was not selected in the view filter
+    #                     column_delete_set.add(key)
+    #                     continue
+    #                 else:
+    #                     if key != 'processo':
+    #                     # processo is a useless key to filter but may cause overflow in the date check
+    #                         if not self.is_date(str(value)):
+    #                             # it's  not a date
+    #                             if key in filters_dict.keys():
+    #                                 # key may have been filtered
+    #                                 if not self.filter_is_empty(filters_dict[key]):
+    #                                     # filter for this key is not empty
+    #                                     if value not in filters_dict[key]:
+    #                                         add_permission = False
+    #                         else:
+    #                             # it's a date
+    #                             if key in filters_dict.keys():
+    #                                 if not self.filter_is_empty(filters_dict[key]):
+    #                                     initial_date = filters_dict[key][1]
+    #                                     if initial_date == '':
+    #                                         initial_date = '1700-01-01'
+    #                                     end_date = filters_dict[key][0]
+    #                                     if end_date == '':
+    #                                         end_date = '5000-01-01'
+    #                                     if (parse(value) < parse(initial_date)) or (parse(value) > parse(end_date)):
+    #                                         add_permission = False
+    #             # Delete the unwanted columns
+    #             for column in column_delete_set:
+    #                 del tmp_dict[column]
+    #             if add_permission:
+    #                 new_data.append(tmp_dict)
+    #
+    #     return new_data
 
     def save_csv(self, data):
         #df = pd.DataFrame.from_records(data)
         file_name = 'veritas_consulta'
         f = tk.filedialog.asksaveasfile(mode='w', defaultextension=".csv", initialfile=file_name, title='Salvar como')
         if not f.name == '':
-            print(f'name: {f.name}')
-            data.to_csv(f.name, single_file=True)
+            data.to_csv(f.name)
         else:
             return
 
@@ -191,12 +256,8 @@ class LoadFilesModel():
         file_name = 'veritas_consulta'
         f = tk.filedialog.asksaveasfile(mode='w', defaultextension=".json", initialfile=file_name, title='Salvar como')
         if not f.name == '':
-            # One json file is going to be created for each partition of the data
-            name_without_extension = f.name.split('.')[0]
-            file_name = name_without_extension.split('/')[-1]
-            data.to_json(name_without_extension+'-*.json', orient='records', lines=False, force_ascii=False)
-            # Remove the annoying empty json file that is generated
-            os.remove(name_without_extension+'.json')
+            with open(f.name, 'w', encoding='utf-8') as file:
+                data.to_json(file, orient='records', force_ascii=False)
         else:
             return
 
@@ -236,7 +297,6 @@ class CountDocuments(ComponentModel):
         return string
 
     def insert_linebreak(self,string, lengLabel=20):
-        string = str(string)
         return '\n'.join(string[i:i+lengLabel] for i in range(0, len(string), lengLabel))
 
     def execute(self, data, extra_input):
@@ -251,8 +311,8 @@ class CountDocuments(ComponentModel):
         for column in extra_input['selected_categories']:
             if column in df.columns:
                 output.append('\nNúmero de documentos por: ' + str(column))
-                absolute_count = df[column].value_counts().compute()
-                relative_count = df[column].value_counts(normalize = True).compute()
+                absolute_count = df[column].value_counts()
+                relative_count = df[column].value_counts(normalize = True)
                 tmp_df = pd.DataFrame({'Absoluto': absolute_count, 'Relativo' : relative_count})
                 output.append(tmp_df)
                 if extra_input['bar_selected'] == 1:
@@ -320,8 +380,8 @@ class MatchNames(ComponentModel):
             author = np.NaN
             defendant = np.NaN
             victim = np.NaN
-            # if i == print_index or data.iloc[i]['processo'] == processo:
-            #     print(text)
+            if i == print_index or data.iloc[i]['processo'] == processo:
+                print(text)
             sentence = general_pattern.search(text)
             if sentence:
                 # Check if there is a victim
@@ -333,9 +393,9 @@ class MatchNames(ComponentModel):
                     victim_search = victim_pattern.search(sentence.group())
                     if victim_search:
                         victim = victim_search.group()
-                        # if i == print_index or data.iloc[i]['processo'] == processo:
-                        #     print(f'\n\vítima: ', victim_search.group())
-                        #     print('vitima real=', victim)
+                        if i == print_index or data.iloc[i]['processo'] == processo:
+                            print(f'\n\vítima: ', victim_search.group())
+                            print('vitima real=', victim)
                     # get the remaining text without the victim
                     no_victim_pattern = re.compile(r'.*(?=\s(Vítima|Vitima))')
                     no_victim_search = no_victim_pattern.search(sentence.group())
@@ -346,13 +406,13 @@ class MatchNames(ComponentModel):
                 # First get the phrase without the first colon
                 remove_first_colon_pattern = re.compile(r'(?<=:\s).*')
                 no_first_colon_search = remove_first_colon_pattern.search(sentence.group())
-                # if i == print_index or data.iloc[i]['processo'] == processo:
-                #     print(f'\n\nsentence: ', sentence.group())
+                if i == print_index or data.iloc[i]['processo'] == processo:
+                    print(f'\n\nsentence: ', sentence.group())
                 if no_first_colon_search:
                     # Now get the author, which is the text before the word that is before the remaining colon
                     #author_pattern = re.compile(r'(?<=:\s).*(?=\s(\S+):)')
-                    # if i == print_index or data.iloc[i]['processo'] == processo:
-                    #     print(f'\n\nno_first_colon_search: ', no_first_colon_search.group())
+                    if i == print_index or data.iloc[i]['processo'] == processo:
+                        print(f'\n\nno_first_colon_search: ', no_first_colon_search.group())
                     author_pattern = re.compile(r'.*(?=\s(\S*):)')
                     author_search = author_pattern.search(no_first_colon_search.group())
                     if author_search:
@@ -417,15 +477,13 @@ class MatchNames(ComponentModel):
             defendants.append(defendant)
             victims.append(victim)
             i = i+1
-
-        data = data.assign(autor=authors, réu=defendants, vítima=victims)
-        # data['autor'] = dd.from_pandas(pd.Series(authors), npartitions=data.npartitions).reset_index()
-        # data['réu'] =  dd.Series(defendants)
-        # data['vítima'] =  dd.Series(victims)
+        data['autor'] = authors
+        data['réu'] = defendants
+        data['vítima'] = victims
         null_authors = data['autor'].isnull().sum()
         null_defendants = data['réu'].isnull().sum()
         null_victims = data['vítima'].isnull().sum()
-        rows = data.shape[0]
+        rows = len(data)
         print(f'autores faltantes: {(null_authors/rows)*100}%\nréus faltantes:{(null_defendants/rows)*100}%\nvítimas faltantes:{(null_victims/rows)*100}%\n')
         return data
 
@@ -460,12 +518,12 @@ class MatchNames(ComponentModel):
 
         # Recover de process code from the selected processes
         author_merge = not_unique.merge(data, left_index=True, right_on = ['comarca','autor'])
-        author_merge = author_merge.drop('réu',axis=1)
-        author_merge = author_merge.rename(columns={'autor': 'nome'})
+        author_merge.drop('réu',axis=1, inplace=True)
+        author_merge.rename(columns={'autor': 'nome'}, inplace=True)
         author_merge['autor ou réu'] = 'autor'
         defendant_merge = not_unique.merge(data, left_index=True, right_on = ['comarca','réu'])
-        defendant_merge = defendant_merge.drop('autor',axis=1)
-        defendant_merge = defendant_merge.rename(columns={'réu': 'nome'})
+        defendant_merge.drop('autor',axis=1, inplace=True)
+        defendant_merge.rename(columns={'réu': 'nome'}, inplace=True)
         defendant_merge['autor ou réu'] = 'réu'
         author_defendant_merge = pd.concat([author_merge,defendant_merge], sort = False)
         author_defendant_merge = author_defendant_merge.sort_values('nome').reset_index()
@@ -490,57 +548,43 @@ class MatchNames(ComponentModel):
                 is_name_list.append(False)
         return np.array(is_name_list)
 
-    def set_part1_part2(self, dd):
-        # Convert the useful columns to pandas dataframe
-        useful_columns = dd.loc[:,['autor','réu','vítima']]
-        # The part to be considered is the victim if it exists and the author otherwise
-        useful_columns['parte1'] = np.where(useful_columns['vítima'] == 'nan', useful_columns['autor'], useful_columns['vítima'])
-        useful_columns['parte2'] = useful_columns['réu']
-        # Remove companies, government institutions, etc.
-        # new_data['parte1'] = np.where(self.is_person(new_data['parte1']), new_data['parte1'], np.nan)
-        # new_data['parte2'] = np.where(self.is_person(new_data['parte2']), new_data['parte2'], np.nan)
-        useful_columns['parte1'] = np.where(useful_columns['parte1'].str.lower().str.contains('justiça pública', regex=False, na=False), np.nan, useful_columns['parte1'])
-        useful_columns['parte2'] = np.where(useful_columns['parte2'].str.lower().str.contains('justiça pública', regex=False, na=False), np.nan, useful_columns['parte2'])
-
-        # Sort so the order doesnt matter
-        useful_columns['parte1'] = useful_columns['parte1'].map(lambda x: x.lower() if isinstance(x,str) else x)
-        useful_columns['parte2'] = useful_columns['parte2'].map(lambda x: x.lower() if isinstance(x,str) else x)
-        useful_columns[['parte1','parte2']] = np.sort(useful_columns[['parte1','parte2']].astype('str'), axis = 1)
-
-        # Assign new columns to the dask dataframe
-        dd = dd.assign(parte1 = useful_columns['parte1'], parte2 = useful_columns['parte2'])
-
-        # Remove missing values
-        dd = dd.replace(['nan','','NaN'],np.nan)
-        dd = dd.dropna(axis = 0, how='any', subset=['parte1','parte2'])
-
-        return dd
     def search_pairs(self,data):
         # Copy so it doesnt cause inconsistency
         new_data = data.copy().astype('str')
-        dataTypeDict = dict(new_data.dtypes)
-        dataTypeDict['parte1'] = 'object'
-        dataTypeDict['parte2'] = 'object'
-        new_data = new_data.map_partitions(self.set_part1_part2, meta=dataTypeDict)
-        #new_data = new_data[['autor','réu','vítima']].compute()
 
-        data_grouped_count = new_data.groupby(['parte1','parte2']).size().compute()
+        # The part to be considered is the victim if it exists and the author otherwise
+        new_data['parte1'] = np.where(new_data['vítima'] == 'nan', new_data['autor'], new_data['vítima'])
+        new_data['parte2'] = new_data['réu']
+
+        # Remove companies, government institutions, etc.
+        # new_data['parte1'] = np.where(self.is_person(new_data['parte1']), new_data['parte1'], np.nan)
+        # new_data['parte2'] = np.where(self.is_person(new_data['parte2']), new_data['parte2'], np.nan)
+        new_data['parte1'] = np.where(new_data['parte1'].str.lower().str.contains('justiça pública', regex=False, na=False), np.nan, new_data['parte1'])
+        new_data['parte2'] = np.where(new_data['parte2'].str.lower().str.contains('justiça pública', regex=False, na=False), np.nan, new_data['parte2'])
+
+        # Remove missing values
+        new_data = new_data.replace(['nan','','NaN'],np.nan)
+        new_data = new_data.dropna(axis = 0, how='any', subset=['parte1','parte2'])
+
+        # Sort so the order doesnt matter
+        new_data['parte1'] = new_data['parte1'].map(lambda x: x.lower() if isinstance(x,str) else x)
+        new_data['parte2'] = new_data['parte2'].map(lambda x: x.lower() if isinstance(x,str) else x)
+        new_data[['parte1','parte2']] = np.sort(new_data[['parte1','parte2']].astype('str'), axis = 1)
+
+        data_grouped_count = new_data.groupby(['parte1','parte2']).size()
         data_count = pd.DataFrame({'Número de Aparições': data_grouped_count})
         not_unique = data_count.loc[data_count['Número de Aparições'] > 1]
         n_pairs = len(data_count)
         not_unique_pairs = len(not_unique)
-        # Convert to dask dataframe
-        not_unique = dd.from_pandas(not_unique.reset_index(), npartitions=1)
 
-        # Merge to recover process code and remaining columns
-        merged_pairs = not_unique.merge(new_data, left_index = False, left_on = ['parte1', 'parte2'], right_on = ['parte1','parte2'])
+        # Merge to recover process code
+        merged_pairs = not_unique.merge(new_data, left_index = True, right_on = ['parte1','parte2'])
 
         # Assign a number to each group
-        merged_pairs = merged_pairs.compute()
         merged_pairs['grupo'] = merged_pairs.groupby(['parte1','parte2']).ngroup()
         merged_pairs['grupo'] = merged_pairs['grupo'] + 1
-        merged_pairs = merged_pairs.set_index('grupo')
-        merged_pairs = merged_pairs.rename(columns = {'Número de Aparições': 'tamanho_grupo'})
+        merged_pairs.set_index('grupo', inplace = True)
+        merged_pairs.rename(columns = {'Número de Aparições': 'tamanho_grupo'}, inplace=True)
         if 'pagina' in merged_pairs.columns:
             merged_pairs = merged_pairs.drop(columns=['pagina','parte1','parte2'])
         else:
@@ -564,12 +608,8 @@ class MatchNames(ComponentModel):
 
     def execute(self,data, extra_input):
         output = []
-        # Extract author, defendant and victim from the text, add it as three new columns
-        dataTypeDict = dict(data.dtypes)
-        dataTypeDict['autor'] = 'object'
-        dataTypeDict['réu'] = 'object'
-        dataTypeDict['vítima'] = 'object'
-        data = data.map_partitions(self.extract_people, meta=dataTypeDict)
+        # Extract author and defendant from the text, add it as two new columns
+        data = self.extract_people(data)
         # gender1 = get_gender('Guilherme')
         # gender2 = get_gender('Justíça Pública')
         # print(gender1)

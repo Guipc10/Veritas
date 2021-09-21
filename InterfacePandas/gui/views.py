@@ -427,36 +427,35 @@ class QueryView(View):
         header.grid(row = 0, pady = 20)
 
         # Show a sample of the data
-        table_frame = ttk.LabelFrame(main_frame, text='Exibindo as 300 primeiras linhas',  width = 1500, height = 500)
+        table_frame = ttk.Frame(main_frame, width = 1500, height = 500)
         table_frame.grid(row = 1, padx = 20)
         table_frame.grid_propagate(0)
-
-        # Create a TreeView, that is going to show the sample of the data
-        tv1 = ttk.Treeview(table_frame, height = 20)
-        tv1.pack(fill='both')
-        treescrollx = tk.Scrollbar(table_frame, orient='horizontal', command = tv1.xview)
-        treescrolly = tk.Scrollbar(table_frame, orient='vertical', command = tv1.yview)
-        tv1.configure(xscrollcommand=treescrollx.set, yscrollcommand=treescrolly.set)
-        treescrolly.place(relx=0.99, rely=0.045, relheight=0.93, relwidth=0.010)
-        treescrollx.pack(side='bottom',fill='x')
-
-        # Put the data into the treeview
-        tv1['column'] = list(df.columns)
-        tv1['show'] = 'headings'
-        for column in tv1['columns']:
-            tv1.heading(column,text=column)
-
-        if df.shape[0].compute() < 300:
-            df_rows = data.compute().to_numpy().tolist()
-        else:
-            df_rows = data.head(300).to_numpy().tolist()
-
-        for row in df_rows:
-            tv1.insert('','end',values=row)
-
+        table = pdt.Table(table_frame, showtoolbar = False, showstatusbar = False, width = 500)
+        table.model.df = df
+        options = {'align': 'w',
+                 'cellbackgr': 'white',
+                 'cellwidth': 80,
+                 'colheadercolor': 'gray',
+                 'floatprecision': 2,
+                 'font': 'Helvetica',
+                 'fontsize': 10,
+                 'fontstyle': '',
+                 'grid_color': '#ABB1AD',
+                 'linewidth': 1,
+                 'rowheight': 22,
+                 'rowselectedcolor': '#E4DED4',
+                 'textcolor': 'black'}
+        pdt.config.apply_options(options,table)
+        table.show()
+        # txt = tk.Text(main_frame, width = TEXT_WIDGET_WIDTH, height = 15, wrap=tk.NONE)
+        # txt.tag_config('center', justify = tk.CENTER, wrap = None)
+        # txt.grid(row = 1)
+        # txt.insert(tk.END,str(df.head(20)),'center')
+        # # Read only
+        # txt.config(state=tk.DISABLED)
 
         # Info label
-        n_rows = df.shape[0].compute()
+        n_rows = df.shape[0]
         n_columns = df.shape[1]
         info_label = ttk.Label(main_frame, text = f'Há {n_rows} documentos nesta consulta e o número de atributos selecionados é {n_columns}.')
         info_label.grid(row = 2, pady = 10)
@@ -472,67 +471,6 @@ class QueryView(View):
         json_button.grid(row = 0, column = 1, padx = 10)
 
         return csv_button, json_button
-    # def generate_query_result_page(self, parent, index, data):
-    #     # Close tab button
-    #     df = data
-    #     close_button_frame = ttk.Frame(parent, width = 2)
-    #     close_button_frame.pack(side='top',fill='both',expand=True)
-    #     close_button = ttk.Button(close_button_frame, text = 'X', style = 'Close.TButton')
-    #     close_button.pack(side='right')
-    #     close_button.bind('<Button-1>', lambda event: self.notebook.hide('current'))
-    #
-    #     main_frame = ttk.Frame(parent)
-    #     main_frame.pack(side='top',fill='both',expand=True)
-    #     main_frame.columnconfigure(0, weight = 1)
-    #
-    #     header = ttk.Label(main_frame, style = "Header.TLabel", text = 'Resultado da consulta')
-    #     header.grid(row = 0, pady = 20)
-    #
-    #     # Show a sample of the data
-    #     table_frame = ttk.Frame(main_frame, width = 1500, height = 500)
-    #     table_frame.grid(row = 1, padx = 20)
-    #     table_frame.grid_propagate(0)
-    #     table = pdt.Table(table_frame, showtoolbar = False, showstatusbar = False, width = 500)
-    #     table.model.df = df
-    #     options = {'align': 'w',
-    #              'cellbackgr': 'white',
-    #              'cellwidth': 80,
-    #              'colheadercolor': 'gray',
-    #              'floatprecision': 2,
-    #              'font': 'Helvetica',
-    #              'fontsize': 10,
-    #              'fontstyle': '',
-    #              'grid_color': '#ABB1AD',
-    #              'linewidth': 1,
-    #              'rowheight': 22,
-    #              'rowselectedcolor': '#E4DED4',
-    #              'textcolor': 'black'}
-    #     pdt.config.apply_options(options,table)
-    #     table.show()
-    #     # txt = tk.Text(main_frame, width = TEXT_WIDGET_WIDTH, height = 15, wrap=tk.NONE)
-    #     # txt.tag_config('center', justify = tk.CENTER, wrap = None)
-    #     # txt.grid(row = 1)
-    #     # txt.insert(tk.END,str(df.head(20)),'center')
-    #     # # Read only
-    #     # txt.config(state=tk.DISABLED)
-    #
-    #     # Info label
-    #     n_rows = df.shape[0]
-    #     n_columns = df.shape[1]
-    #     info_label = ttk.Label(main_frame, text = f'Há {n_rows} documentos nesta consulta e o número de atributos selecionados é {n_columns}.')
-    #     info_label.grid(row = 2, pady = 10)
-    #
-    #     # Buttons
-    #     buttons_frame = ttk.Frame(main_frame)
-    #     buttons_frame.grid(row = 3, pady = 10)
-    #
-    #     csv_button = ttk.Button(buttons_frame, text = 'Exportar para CSV')
-    #     csv_button.grid(row = 0, column = 0, padx = 10)
-    #
-    #     json_button = ttk.Button(buttons_frame, text = 'Exportar para JSON')
-    #     json_button.grid(row = 0, column = 1, padx = 10)
-    #
-    #     return csv_button, json_button
 
 # Define a custom PDF class so some methods can be overwritten
 class PDF(FPDF):
@@ -848,7 +786,7 @@ class StatisticsOptionsView(View):
                     pdf.multi_cell(0,6,printable, ln = True, align='L')
             else:
                 raise TypeError('Models output list must contain only strings (Text) or path to png/jpeg image')
-
+        
         file_name = 'veritas_'+model_name
         f = tk.filedialog.asksaveasfile(mode='w', defaultextension=".pdf", initialfile=file_name, title='Salvar como')
         if not f.name == '':
